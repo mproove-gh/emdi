@@ -236,6 +236,7 @@ final class MarkdownTextView: NSTextView {
     }
 
     /// Goes through `shouldChangeText`/`didChangeText` so the edit is undoable and the delegate restyles.
+    /// Numbered lists around the edit are then renumbered.
     private func apply(_ edit: TextEdit, actionName: String) {
         guard shouldChangeText(in: edit.range, replacementString: edit.replacement) else { return }
         textStorage?.replaceCharacters(in: edit.range, with: edit.replacement)
@@ -243,6 +244,46 @@ final class MarkdownTextView: NSTextView {
         setSelectedRange(edit.selection)
         scrollRangeToVisible(edit.selection)
         undoManager?.setActionName(actionName)
+        renumberLists(touching: NSRange(location: edit.range.location, length: (edit.replacement as NSString).length))
+    }
+
+    // MARK: Renumbering
+
+    /// Set when a change adds or removes a line break, which can add, remove or merge list items.
+    private var pendingRenumber: NSRange?
+    private var isRenumbering = false
+
+    override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        guard super.shouldChangeText(in: affectedCharRange, replacementString: replacementString) else { return false }
+        let text = string as NSString
+        let removesLineBreak = NSMaxRange(affectedCharRange) <= text.length
+            && text.substring(with: affectedCharRange).contains("\n")
+        if !isRenumbering, removesLineBreak || replacementString?.contains("\n") == true {
+            pendingRenumber = NSRange(location: affectedCharRange.location,
+                                      length: ((replacementString ?? "") as NSString).length)
+        }
+        return true
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        if let range = pendingRenumber {
+            pendingRenumber = nil
+            renumberLists(touching: range)
+        }
+    }
+
+    /// Keeps numbered lists counting 1, 2, 3… after items are added, removed or moved.
+    /// Skipped while undoing or redoing, so undo restores exactly what was there.
+    private func renumberLists(touching range: NSRange) {
+        guard !isRenumbering, !hasMarkedText(), undoManager?.isUndoing != true, undoManager?.isRedoing != true,
+              let edit = ListEditing.renumber(in: string, touching: range, selection: selectedRange()) else { return }
+        isRenumbering = true
+        defer { isRenumbering = false }
+        guard shouldChangeText(in: edit.range, replacementString: edit.replacement) else { return }
+        textStorage?.replaceCharacters(in: edit.range, with: edit.replacement)
+        didChangeText()
+        setSelectedRange(edit.selection)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {

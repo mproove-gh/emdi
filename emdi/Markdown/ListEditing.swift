@@ -1,4 +1,5 @@
 import Foundation
+import Markdown
 
 /// Editing helpers for list and quote lines: Return continues the list, Tab / Shift-Tab nest it.
 /// Pure: each function returns the `TextEdit` to apply, or nil to let the text view behave normally.
@@ -71,10 +72,71 @@ enum ListEditing {
     }
 
     /// Tab on list lines: indent each one by its marker's width, so it nests under the item above.
+    /// A numbered item restarts at 1, which `renumber` then fixes if it joins an existing sub-list.
     static func indent(in text: NSString, selection: NSRange) -> TextEdit? {
         editListLines(in: text, selection: selection) { line, prefix in
-            String(repeating: " ", count: prefix.markerWidth) + line
+            var line = line
+            if let number = prefix.number {
+                let digits = String(number)
+                if let range = line.range(of: digits + prefix.delimiter) {
+                    line.replaceSubrange(range, with: "1" + prefix.delimiter)
+                }
+            }
+            return String(repeating: " ", count: prefix.markerWidth) + line
         }
+    }
+
+    /// Renumbers the numbered lists that `range` touches (nested ones included) so each counts up
+    /// from its first item's number. Returns nil when they are already in order.
+    static func renumber(in text: String, touching range: NSRange, selection: NSRange) -> TextEdit? {
+        let ns = text as NSString
+        let map = SourceMap(text)
+        var replacements: [(range: NSRange, number: String)] = []
+
+        /// `inTouchedList`: a list containing this node was touched, so its sub-lists are renumbered too.
+        func visit(_ node: any Markup, inTouchedList: Bool = false) {
+            var touched = inTouchedList
+            if let list = node as? OrderedList, let listRange = list.range.map(map.nsRange(of:)) {
+                touched = touched || (range.location <= NSMaxRange(listRange) && NSMaxRange(range) >= listRange.location)
+            }
+            if let list = node as? OrderedList, touched {
+                var number = Int(list.startIndex)
+                for item in list.listItems {
+                    defer { number += 1 }
+                    guard let itemRange = item.range.map(map.nsRange(of:)) else { continue }
+                    var end = itemRange.location
+                    while end < ns.length, let scalar = UnicodeScalar(ns.character(at: end)),
+                          CharacterSet.decimalDigits.contains(scalar), scalar.isASCII { end += 1 }
+                    let digits = NSRange(location: itemRange.location, length: end - itemRange.location)
+                    if digits.length > 0, ns.substring(with: digits) != String(number) {
+                        replacements.append((digits, String(number)))
+                    }
+                }
+            }
+            let touchedBullets = !touched && node is UnorderedList && node.range.map(map.nsRange(of:)).map {
+                range.location <= NSMaxRange($0) && NSMaxRange(range) >= $0.location
+            } == true
+            for child in node.children { visit(child, inTouchedList: touched || touchedBullets) }
+        }
+        visit(Document(parsing: text))
+        guard !replacements.isEmpty else { return nil }
+
+        replacements.sort { $0.range.location < $1.range.location }
+        let first = replacements[0].range.location
+        let last = NSMaxRange(replacements[replacements.count - 1].range)
+        var rebuilt = ""
+        var cursor = first
+        var shift = 0
+        for replacement in replacements {
+            rebuilt += ns.substring(with: NSRange(location: cursor, length: replacement.range.location - cursor))
+            rebuilt += replacement.number
+            cursor = NSMaxRange(replacement.range)
+            if NSMaxRange(replacement.range) <= selection.location {
+                shift += (replacement.number as NSString).length - replacement.range.length
+            }
+        }
+        return TextEdit(range: NSRange(location: first, length: last - first), replacement: rebuilt,
+                        selection: NSRange(location: selection.location + shift, length: selection.length))
     }
 
     /// Shift-Tab on list lines: remove up to one marker width of leading spaces (a tab counts as one level).
