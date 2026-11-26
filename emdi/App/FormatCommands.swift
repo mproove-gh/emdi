@@ -15,6 +15,13 @@ struct FormatCommands: Commands {
             Menu("Insert") {
                 ForEach(FormatCommand.insertGroup, id: \.self, content: button)
             }
+            // Acts on the table holding the caret; does nothing elsewhere.
+            Menu("Table") {
+                ForEach(Array(FormatCommand.tableSections.enumerated()), id: \.offset) { index, section in
+                    if index > 0 { Divider() }
+                    ForEach(section, id: \.self, content: button)
+                }
+            }
         }
     }
 

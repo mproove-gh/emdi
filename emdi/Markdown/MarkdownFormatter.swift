@@ -27,11 +27,42 @@ enum FormatCommand: String, CaseIterable, Sendable {
     case paragraph, heading1, heading2, heading3, heading4, heading5, heading6
     case quote, bulletList, numberedList, taskList, codeBlock
     case table, horizontalRule
+    case insertColumnLeft, insertColumnRight, deleteColumn
+    case insertRowAbove, insertRowBelow, deleteRow
+    case alignColumnLeft, alignColumnCenter, alignColumnRight
 
     static let inlineGroup: [FormatCommand] = [.bold, .italic, .strikethrough, .inlineCode, .link]
     static let headingGroup: [FormatCommand] = [.paragraph, .heading1, .heading2, .heading3, .heading4, .heading5, .heading6]
     static let blockGroup: [FormatCommand] = [.quote, .bulletList, .numberedList, .taskList, .codeBlock]
     static let insertGroup: [FormatCommand] = [.table, .horizontalRule]
+    /// The Table submenu, in sections separated by dividers.
+    static let tableSections: [[FormatCommand]] = [
+        [.insertRowAbove, .insertRowBelow, .deleteRow],
+        [.insertColumnLeft, .insertColumnRight, .deleteColumn],
+        [.alignColumnLeft, .alignColumnCenter, .alignColumnRight],
+    ]
+
+    /// The row/column operation of a Table command, nil for other commands.
+    var tableOperation: TableStructure.Operation? {
+        switch self {
+        case .insertColumnLeft: .insertColumn(after: false)
+        case .insertColumnRight: .insertColumn(after: true)
+        case .deleteColumn: .deleteColumn
+        case .insertRowAbove: .insertRow(below: false)
+        case .insertRowBelow: .insertRow(below: true)
+        case .deleteRow: .deleteRow
+        case .alignColumnLeft: .align(.left)
+        case .alignColumnCenter: .align(.center)
+        case .alignColumnRight: .align(.right)
+        default: nil
+        }
+    }
+
+    /// Whether the command applies at `selection` (Table commands need the caret in a table).
+    func isAvailable(in text: String, selection: NSRange) -> Bool {
+        guard let operation = tableOperation else { return true }
+        return TableStructure.canPerform(operation, in: text, selection: selection)
+    }
 
     var title: String {
         switch self {
@@ -54,6 +85,15 @@ enum FormatCommand: String, CaseIterable, Sendable {
         case .codeBlock: "Code Block"
         case .table: "Table"
         case .horizontalRule: "Horizontal Rule"
+        case .insertColumnLeft: "Insert Column Left"
+        case .insertColumnRight: "Insert Column Right"
+        case .deleteColumn: "Delete Column"
+        case .insertRowAbove: "Insert Row Above"
+        case .insertRowBelow: "Insert Row Below"
+        case .deleteRow: "Delete Row"
+        case .alignColumnLeft: "Align Column Left"
+        case .alignColumnCenter: "Align Column Center"
+        case .alignColumnRight: "Align Column Right"
         }
     }
 
@@ -77,10 +117,17 @@ enum FormatCommand: String, CaseIterable, Sendable {
         case .taskList: Shortcut(key: "x", modifiers: [.command, .option])
         case .codeBlock: Shortcut(key: "c", modifiers: [.command, .option])
         case .table, .horizontalRule: nil  // ⌥⌘T is taken by View ▸ Show Toolbar
+        case .insertColumnLeft, .insertColumnRight, .deleteColumn, .insertRowAbove, .insertRowBelow, .deleteRow,
+             .alignColumnLeft, .alignColumnCenter, .alignColumnRight: nil
         }
     }
 
     func edit(in text: String, selection: NSRange) -> TextEdit {
+        if let operation = tableOperation {
+            // Outside a table (or when impossible, like deleting the only column) nothing changes.
+            return TableStructure.edit(operation, in: text, selection: selection)
+                ?? TextEdit(range: NSRange(location: selection.location, length: 0), replacement: "", selection: selection)
+        }
         let text = text as NSString
         switch self {
         case .bold: return MarkdownFormatter.toggleInline("**", in: text, selection: selection)
@@ -105,6 +152,9 @@ enum FormatCommand: String, CaseIterable, Sendable {
                                                  select: NSRange(location: 2, length: 8), in: text, selection: selection)
         case .horizontalRule:
             return MarkdownFormatter.insertBlock("---\n", select: NSRange(location: 4, length: 0), in: text, selection: selection)
+        case .insertColumnLeft, .insertColumnRight, .deleteColumn, .insertRowAbove, .insertRowBelow, .deleteRow,
+             .alignColumnLeft, .alignColumnCenter, .alignColumnRight:
+            preconditionFailure("handled above")
         }
     }
 }

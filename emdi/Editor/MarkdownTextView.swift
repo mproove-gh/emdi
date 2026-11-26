@@ -312,11 +312,35 @@ final class MarkdownTextView: NSTextView {
         formatItems.append(submenuItem("Heading", FormatCommand.headingGroup))
         formatItems += FormatCommand.blockGroup.map(menuItem)
         formatItems.append(submenuItem("Insert", FormatCommand.insertGroup))
+        if TableStructure.position(in: string, selection: selectedRange()) != nil {
+            formatItems.append(tableSubmenuItem())
+        }
         formatItems.append(.separator())
         for (index, item) in formatItems.enumerated() {
             menu.insertItem(item, at: index)
         }
         return menu
+    }
+
+    /// Row and column commands, shown only when the caret is in a table.
+    private func tableSubmenuItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Table", action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: "Table")
+        for (index, section) in FormatCommand.tableSections.enumerated() {
+            if index > 0 { submenu.addItem(.separator()) }
+            section.map(menuItem).forEach(submenu.addItem)
+        }
+        item.submenu = submenu
+        return item
+    }
+
+    /// Greys out commands that can't apply here, like deleting the only column of a table.
+    override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(performFormatCommand(_:)) {
+            let command = (menuItem.representedObject as? String).flatMap(FormatCommand.init(rawValue:))
+            return isEditable && (command?.isAvailable(in: string, selection: selectedRange()) ?? true)
+        }
+        return super.validateMenuItem(menuItem)
     }
 
     private func submenuItem(_ title: String, _ commands: [FormatCommand]) -> NSMenuItem {
