@@ -83,6 +83,12 @@ open build/Build/Products/Debug/emdi.app                           # run
 - Every document opens as a tab of the frontmost emdi window, whatever the system's "Prefer tabs when opening documents" setting says. `DocumentTabsHook` (`emdi/App/DocumentTabs.swift`) is a background view in each document scene. It catches the `NSWindow` in `viewDidMoveToWindow`, and `DocumentTabs.adopt` gives it the `emdi.document` tabbing identifier and joins it to the frontmost visible document window with `addTabbedWindow`.
 - To check this in the running app without Accessibility access, list emdi's layer-0 windows with `CGWindowListCopyWindowInfo` from a small `swift` script. Tabs show up as several windows with the same frame, only one of them on screen.
 
+## App icon (implemented)
+
+- The design is serif "eMD" followed by an orange text cursor that stands for the "I". At 32 px and below, only "e" and the cursor are drawn. The icons are **generated**: edit `tools/make-icons.swift` and run `swift tools/make-icons.swift` from the repo root. It writes the default white icon to `emdi/Assets.xcassets/AppIcon.appiconset` and the alternate icon to `emdi/Resources/AppIcon-Anthracite.icns`. Don't edit the PNGs by hand.
+- emdi ▸ Settings (⌘,) is `SettingsView` in `emdi/App/AppIcon.swift`. It stores the choice in the `appIcon` user default (`white` by default, or `anthracite`). `AppIcon.apply` sets `NSApp.applicationIconImage` for the running Dock icon. It also sets the bundle's custom Finder icon with `NSWorkspace.setIcon(_:forFile:)`, which adds an `Icon\r` file to the bundle; a rebuild discards that file, so `AppDelegate` re-applies a non-default choice at launch.
+- To see the icon as the system shows it, render `NSWorkspace.shared.icon(forFile:)` of the built app to a PNG. Running `lsregister -f` on the app first refreshes Launch Services. SwiftUI `Text` doesn't appear in `cacheDisplay` captures; render SwiftUI-only views with `ImageRenderer` instead.
+
 ## Verifying rendering visually
 
 Screen capture isn't available to Claude here. To check how things look, add a temporary `@MainActor` Swift Testing test. It hosts `MarkdownEditorView` in an `NSHostingView` inside an offscreen `NSWindow`, renders it with `bitmapImageRepForCachingDisplay` / `cacheDisplay(in:to:)`, and writes a PNG to the scratchpad. Run it with `-only-testing`, look at the PNG, then delete the test. Hover states can be triggered by calling `mouseMoved(with:)` with a synthesized event.
