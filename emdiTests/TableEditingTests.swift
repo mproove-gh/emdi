@@ -42,4 +42,48 @@ struct TableEditingTests {
     @Test func outsideTablesTabIsLeftAlone() {
         #expect(tab("Intro\n\n" + table, at: 2) == nil)
     }
+
+    /// Applies a user edit (replace `range` with `replacement`) through the structure protection.
+    private func userEdit(_ text: String, range: NSRange, replacement: String) -> String {
+        let tables = Array(Set(MarkdownStyler.spans(for: text).map { span -> NSRange? in
+            if case .tableRow = span.kind { span.blockRange } else { nil }
+        }.compactMap { $0 }))
+        let edit = TableEditing.protectingStructure(in: text as NSString, tables: tables, range: range, replacement: replacement)
+            ?? TextEdit(range: range, replacement: replacement, selection: range)
+        return (text as NSString).replacingCharacters(in: edit.range, with: edit.replacement)
+    }
+
+    @Test func backspaceNeverEatsACellSeparator() {
+        let pipe = (table as NSString).range(of: "| 2").location
+        #expect(userEdit(table, range: NSRange(location: pipe, length: 1), replacement: "") == table)
+        // Deleting a character inside a cell is normal.
+        #expect(userEdit(table, range: NSRange(location: pipe - 2, length: 1), replacement: "") == "| a | bb |\n| --- | --- |\n|  | 2 |")
+    }
+
+    @Test func deletingAcrossCellsEmptiesThemButKeepsTheRow() {
+        let range = (table as NSString).range(of: "1 | 2")
+        #expect(userEdit(table, range: range, replacement: "") == "| a | bb |\n| --- | --- |\n| | |")
+        #expect(userEdit(table, range: range, replacement: "x") == "| a | bb |\n| --- | --- |\n| x| |")
+    }
+
+    @Test func lineBreaksInATableBecomeSpaces() {
+        let at = (table as NSString).range(of: "1").location
+        #expect(userEdit(table, range: NSRange(location: at, length: 1), replacement: "one\ntwo") == "| a | bb |\n| --- | --- |\n| one two | 2 |")
+    }
+
+    @Test func editsOutsideTablesAreUntouched() {
+        let text = "Intro | x\n\n" + table
+        #expect(TableEditing.protectingStructure(in: text as NSString, tables: [NSRange(location: 12, length: 5)],
+                                                 range: NSRange(location: 6, length: 1), replacement: "") == nil)
+    }
+
+    @Test func returnMovesDownAndAddsARowAtTheEnd() {
+        let cells = MarkdownStyler.spans(for: table).filter { if case .tableCell = $0.kind { true } else { false } }
+        let inB = (table as NSString).range(of: "bb").location
+        let down = TableEditing.newline(in: table as NSString, cells: cells, selection: NSRange(location: inB, length: 0))
+        #expect(down.map { (table as NSString).substring(with: $0.selection) } == "2")
+        let last = TableEditing.newline(in: table as NSString, cells: cells,
+                                        selection: NSRange(location: (table as NSString).length - 2, length: 0))
+        #expect(last?.replacement == "\n|  |  |")
+    }
 }

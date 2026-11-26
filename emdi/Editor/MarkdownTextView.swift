@@ -190,6 +190,16 @@ final class MarkdownTextView: NSTextView {
     // MARK: List editing
 
     override func insertNewline(_ sender: Any?) {
+        if !hasMarkedText(), isEditable,
+           let edit = TableEditing.newline(in: string as NSString, cells: tableCells, selection: selectedRange()) {
+            if edit.replacement.isEmpty && edit.range.length == 0 {
+                setSelectedRange(edit.selection)
+                scrollRangeToVisible(edit.selection)
+            } else {
+                apply(edit, actionName: "Add Row")
+            }
+            return
+        }
         if let edit = listEdit(ListEditing.newline) {
             apply(edit, actionName: "Typing")
         } else {
@@ -257,6 +267,8 @@ final class MarkdownTextView: NSTextView {
     /// Goes through `shouldChangeText`/`didChangeText` so the edit is undoable and the delegate restyles.
     /// Numbered lists around the edit are then renumbered.
     private func apply(_ edit: TextEdit, actionName: String) {
+        isApplyingOwnEdit = true
+        defer { isApplyingOwnEdit = false }
         guard shouldChangeText(in: edit.range, replacementString: edit.replacement) else { return }
         textStorage?.replaceCharacters(in: edit.range, with: edit.replacement)
         didChangeText()
@@ -272,7 +284,22 @@ final class MarkdownTextView: NSTextView {
     private var pendingRenumber: NSRange?
     private var isRenumbering = false
 
+    /// True while emdi applies its own edits (commands, list and table keys), which may restructure tables.
+    private var isApplyingOwnEdit = false
+
     override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        // Typing, deleting, cutting or pasting must not break a table: keep its `|` and row breaks.
+        if !isApplyingOwnEdit, !isRenumbering, !hasMarkedText(), let replacementString,
+           undoManager?.isUndoing != true, undoManager?.isRedoing != true,
+           let edit = TableEditing.protectingStructure(in: string as NSString, tables: Array(Set(tableCells.map(\.blockRange))),
+                                                       range: affectedCharRange, replacement: replacementString) {
+            if edit.range.length == 0 && edit.replacement.isEmpty {
+                setSelectedRange(edit.selection)
+            } else {
+                apply(edit, actionName: "Typing")
+            }
+            return false
+        }
         guard super.shouldChangeText(in: affectedCharRange, replacementString: replacementString) else { return false }
         let text = string as NSString
         let removesLineBreak = NSMaxRange(affectedCharRange) <= text.length

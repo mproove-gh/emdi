@@ -30,6 +30,52 @@ enum TableEditing {
         return appendRow(after: current, columns: columnCount(table), in: text)
     }
 
+    /// Return in a table: go to the cell below (same column), or add a row when on the last one.
+    /// Return never splits a table row.
+    static func newline(in text: NSString, cells: [StyleSpan], selection: NSRange) -> TextEdit? {
+        let caret = selection.location
+        guard let block = Set(cells.map(\.blockRange)).first(where: { NSLocationInRange(caret, extendedRange($0)) }) else {
+            return nil
+        }
+        let table = cells.filter { $0.blockRange == block }.sorted { $0.range.location < $1.range.location }
+        guard let current = table.last(where: { $0.range.location <= caret }) ?? table.first else { return stay(selection) }
+        func lineStart(_ cell: StyleSpan) -> Int { text.lineRange(for: NSRange(location: cell.range.location, length: 0)).location }
+        guard case .tableCell(let column, _) = current.kind else { return stay(selection) }
+        let below = table.filter { lineStart($0) > lineStart(current) }
+        guard let nextLine = below.map(lineStart).min() else {
+            return appendRow(after: current, columns: columnCount(table), in: text)
+        }
+        let nextRow = below.filter { lineStart($0) == nextLine }
+        let target = nextRow.first { if case .tableCell(let c, _) = $0.kind { c == column } else { false } } ?? nextRow.last!
+        return select(target, in: text)
+    }
+
+    /// What an edit typed or deleted by the user should do in a table so the table keeps its shape:
+    /// cell separators (`|`) and row breaks are never removed, and new line breaks become spaces.
+    /// Returns nil when the edit touches no table structure (let it through), or the replacement edit to
+    /// make instead. An edit that would only remove structure becomes a no-op (same text, same selection).
+    static func protectingStructure(in text: NSString, tables: [NSRange], range: NSRange,
+                                    replacement: String) -> TextEdit? {
+        guard tables.contains(where: { NSIntersectionRange($0, range).length > 0
+                                       || (range.length == 0 && NSLocationInRange(range.location, $0)) }) else {
+            return nil
+        }
+        let removed = text.substring(with: range)
+        let pipe: Character = "|"
+        let touchesStructure = removed.contains(pipe) || removed.contains("\n") || replacement.contains("\n")
+        guard touchesStructure else { return nil }
+        // Keep the structure that was selected; put what was typed or pasted (on one line) before it.
+        let kept = String(removed.filter { $0 == pipe || $0 == "\n" })
+        let inserted = replacement.replacingOccurrences(of: "\r\n", with: " ").replacingOccurrences(of: "\n", with: " ")
+        let caret = range.location + (inserted as NSString).length
+        if inserted.isEmpty && kept == removed {
+            // Only structure would go (e.g. Backspace right after a hidden `|`): do nothing.
+            return TextEdit(range: NSRange(location: range.location, length: 0), replacement: "",
+                            selection: NSRange(location: range.location + (range.length > 0 ? range.length : 0), length: 0))
+        }
+        return TextEdit(range: range, replacement: inserted + kept, selection: NSRange(location: caret, length: 0))
+    }
+
     // MARK: Helpers
 
     /// The table plus one character, so a caret right after the last pipe still counts.
