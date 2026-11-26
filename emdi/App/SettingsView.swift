@@ -7,12 +7,20 @@ struct SettingsView: View {
     @AppStorage(FontSettings.textSizeKey) private var textSize = FontSettings.defaultTextSize
     @AppStorage(FontSettings.codeFamilyKey) private var codeFamily = ""
     @AppStorage(AppIconChoice.defaultsKey) private var iconChoice: AppIconChoice = .white
+    @AppStorage(AppearanceChoice.defaultsKey) private var appearance: AppearanceChoice = .system
 
     private static let families = EditorFonts.allFamilies
     private static let monospacedFamilies = EditorFonts.monospacedFamilies
 
     var body: some View {
         Form {
+            Section("Appearance") {
+                Picker("Theme", selection: $appearance) {
+                    ForEach(AppearanceChoice.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            }
+
             Section("Fonts") {
                 Picker("Text", selection: $textFamily) {
                     Text("System (SF Pro)").tag("")
@@ -66,6 +74,9 @@ struct SettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
         .onChange(of: iconChoice) { _, newValue in
             AppIcon.apply(newValue)
+        }
+        .onChange(of: appearance) { _, newValue in
+            newValue.apply()
         }
     }
 

@@ -23,14 +23,14 @@ enum MarkdownTheme {
     }()
 
     static var baseAttributes: [NSAttributedString.Key: Any] {
-        [.font: EditorFonts().body, .foregroundColor: NSColor.textColor, .paragraphStyle: paragraphStyle]
+        [.font: EditorFonts().body, .foregroundColor: EditorPalette.text, .paragraphStyle: paragraphStyle]
     }
 
     static func apply(_ spans: [StyleSpan], to storage: NSTextStorage, selection: NSRange, context: ThemeContext) {
         let length = storage.length
         let fonts = EditorFonts()
         storage.beginEditing()
-        storage.setAttributes([.font: fonts.body, .foregroundColor: NSColor.textColor, .paragraphStyle: paragraphStyle],
+        storage.setAttributes([.font: fonts.body, .foregroundColor: EditorPalette.text, .paragraphStyle: paragraphStyle],
                               range: NSRange(location: 0, length: length))
 
         // Blocks first, then inline styles, syntax last so it wins over everything.
@@ -43,9 +43,9 @@ enum MarkdownTheme {
                 storage.addAttribute(.font, value: fonts.code, range: range)
                 markCodeBlockLines(in: range, of: storage)
             case .blockQuote:
-                storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
+                storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range)
             case .thematicBreak:
-                storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: range)
+                storage.addAttribute(.foregroundColor, value: EditorPalette.syntax, range: range)
             case .inlineCode:
                 storage.addAttributes([.font: fonts.code, .backgroundColor: codeBackground], range: range)
             case .strong:
@@ -56,15 +56,15 @@ enum MarkdownTheme {
                 storage.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: range)
             case .link:
                 storage.addAttributes([
-                    .foregroundColor: NSColor.linkColor,
+                    .foregroundColor: EditorPalette.link,
                     .underlineStyle: NSUnderlineStyle.single.rawValue,
                 ], range: range)
             case .marker:
-                storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
+                storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range)
             case .syntax:
                 if StyleSpan.isActive(block: span.blockRange, selection: selection) {
                     storage.addAttributes([
-                        .foregroundColor: NSColor.tertiaryLabelColor,
+                        .foregroundColor: EditorPalette.syntax,
                         .underlineStyle: 0,
                         .strikethroughStyle: 0,
                     ], range: range)
@@ -82,7 +82,7 @@ enum MarkdownTheme {
                 storage.addAttribute(.kern, value: TaskLayoutFragment.checkboxWidth,
                                      range: NSRange(location: NSMaxRange(range) - 1, length: 1))
             case .completedTask:
-                storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
+                storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range)
             case .tableRow(let role):
                 storage.addAttributes([.tableRow: role.rawValue, .paragraphStyle: tableRowParagraphStyle(role)],
                                       range: range)
@@ -111,7 +111,7 @@ enum MarkdownTheme {
                 ]
                 if active {
                     attributes[.font] = fonts.body.withSize(fonts.size - 3)
-                    attributes[.foregroundColor] = NSColor.tertiaryLabelColor
+                    attributes[.foregroundColor] = EditorPalette.syntax
                 } else {
                     attributes[.font] = hiddenFont
                     attributes[.foregroundColor] = NSColor.clear
@@ -123,7 +123,7 @@ enum MarkdownTheme {
         storage.endEditing()
     }
 
-    private static let codeBackground = NSColor.quaternaryLabelColor.withAlphaComponent(0.12)
+    private static let codeBackground = EditorPalette.inlineCodeBackground
 
     private static func order(_ kind: StyleSpan.Kind) -> Int {
         switch kind {
@@ -166,16 +166,15 @@ enum MarkdownTheme {
         return style
     }
 
-    /// System colors, so the palette follows light and dark mode.
     private static func codeColor(_ kind: CodeTokenKind) -> NSColor {
         switch kind {
-        case .keyword: .systemPink
-        case .type: .systemTeal
-        case .string: .systemOrange
-        case .number: .systemPurple
-        case .comment: .secondaryLabelColor
-        case .attribute: .systemBrown
-        case .property: .systemBlue
+        case .keyword: EditorPalette.codeKeyword
+        case .type: EditorPalette.codeType
+        case .string: EditorPalette.codeString
+        case .number: EditorPalette.codeNumber
+        case .comment: EditorPalette.codeComment
+        case .attribute: EditorPalette.codeAttribute
+        case .property: EditorPalette.codeProperty
         }
     }
 
@@ -262,7 +261,7 @@ enum MarkdownTheme {
 
     /// Undoes the grid styling: rows become ordinary paragraphs and the pipes and delimiter row show, dimmed.
     private static func showTableAsMarkdown(_ spans: [StyleSpan], in storage: NSTextStorage, font: NSFont) {
-        let visible: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.tertiaryLabelColor]
+        let visible: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: EditorPalette.syntax]
         for span in spans {
             switch span.kind {
             case .tableRow(let role):

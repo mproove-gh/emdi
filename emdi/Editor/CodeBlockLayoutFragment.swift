@@ -47,7 +47,7 @@ final class CodeBlockLayoutFragment: NSTextLayoutFragment {
         context.clip(to: panel)
         context.addPath(CGPath(roundedRect: shape, cornerWidth: Self.cornerRadius, cornerHeight: Self.cornerRadius,
                                transform: nil))
-        context.setFillColor(NSColor.textColor.withAlphaComponent(0.06).cgColor)
+        context.setFillColor(EditorPalette.codeBlockBackground.cgColor)
         context.fillPath()
         context.restoreGState()
 

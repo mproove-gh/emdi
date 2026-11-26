@@ -37,7 +37,7 @@ final class TaskLayoutFragment: NSTextLayoutFragment {
     override func draw(at point: CGPoint, in context: CGContext) {
         super.draw(at: point, in: context)
 
-        let color: NSColor = isChecked ? .controlAccentColor : .secondaryLabelColor
+        let color: NSColor = isChecked ? EditorPalette.checkboxChecked : EditorPalette.checkbox
         let configuration = NSImage.SymbolConfiguration(pointSize: Self.checkboxSize, weight: .regular)
             .applying(NSImage.SymbolConfiguration(paletteColors: isChecked ? [.white, color] : [color]))
         guard let image = NSImage(systemSymbolName: isChecked ? "checkmark.square.fill" : "square",

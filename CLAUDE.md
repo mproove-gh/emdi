@@ -90,6 +90,12 @@ open build/Build/Products/Debug/emdi.app                           # run
 - The icon choice is the App Icon section of `SettingsView` (`emdi/App/SettingsView.swift`). It stores the choice in the `appIcon` user default (`white` by default, or `anthracite`). `AppIcon.apply` sets `NSApp.applicationIconImage` for the running Dock icon. It also sets the bundle's custom Finder icon with `NSWorkspace.setIcon(_:forFile:)`, which adds an `Icon\r` file to the bundle; a rebuild discards that file, so `AppDelegate` re-applies a non-default choice at launch.
 - To see the icon as the system shows it, render `NSWorkspace.shared.icon(forFile:)` of the built app to a PNG. Running `lsregister -f` on the app first refreshes Launch Services. SwiftUI `Text` doesn't appear in `cacheDisplay` captures; render SwiftUI-only views with `ImageRenderer` instead.
 
+## Themes and colors (implemented)
+
+- Every editor color comes from `EditorPalette` (`emdi/Editor/EditorPalette.swift`). Each color is a dynamic `NSColor` with a light and a dark value that resolves at draw time. Never use system colors such as `NSColor.textColor`, `.systemPink` or `.separatorColor` in the theme or the fragments. Light is warm paper (#FBFAF7) with near-black ink, dark a soft charcoal (#1D1D1F) with off-white text. The emdi orange is reserved for the insertion point. Code colors follow Xcode's default themes.
+- `EditorPaletteTests` enforce WCAG contrast: body text at least 12:1, and secondary text, links and every code color at least 4.5:1 on their background, in both appearances. Run them after changing any color. Revealed syntax (`EditorPalette.syntax`) is deliberately quieter and is not checked.
+- The Appearance section of Settings sets `AppearanceChoice` (`system`, `light`, `dark`; user default `appearance`). `apply()` sets `NSApp.appearance`, and `AppDelegate` applies it at launch. Because the colors are dynamic, switching needs no restyle.
+
 ## Fonts (implemented)
 
 - Settings (`emdi/App/SettingsView.swift`, a grouped `Form`) offers a text font family and size (11–28 pt, default 15) and a code font family. The code picker lists monospaced families first, then all others. Values live in user defaults (`textFontFamily`, `textFontSize`, `codeFontFamily`), and an empty family means the system font (SF Pro, or SF Mono for code).

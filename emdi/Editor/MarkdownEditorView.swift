@@ -32,6 +32,11 @@ struct MarkdownEditorView: NSViewRepresentable {
         textView.usesFindBar = true
         textView.isIncrementalSearchingEnabled = true
         textView.textContainerInset = NSSize(width: 40, height: 30)
+        textView.drawsBackground = true
+        textView.backgroundColor = EditorPalette.background
+        textView.insertionPointColor = EditorPalette.cursor
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = EditorPalette.background
 
         // Markdown characters must stay exactly as typed.
         textView.isAutomaticQuoteSubstitutionEnabled = false

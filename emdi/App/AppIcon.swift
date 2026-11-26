@@ -47,6 +47,7 @@ enum AppIcon {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppearanceChoice.current.apply()
         if AppIcon.current != .white { AppIcon.apply(AppIcon.current) }
     }
 }

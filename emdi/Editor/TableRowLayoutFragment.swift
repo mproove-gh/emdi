@@ -41,10 +41,10 @@ final class TableRowLayoutFragment: NSTextLayoutFragment {
             let rect = grid.rect.offsetBy(dx: point.x, dy: point.y)
             context.saveGState()
             if role.contains(.header) {
-                context.setFillColor(NSColor.textColor.withAlphaComponent(0.05).cgColor)
+                context.setFillColor(EditorPalette.tableHeaderBackground.cgColor)
                 context.fill(rect)
             }
-            context.setStrokeColor(NSColor.separatorColor.cgColor)
+            context.setStrokeColor(EditorPalette.border.cgColor)
             context.setLineWidth(1)
             var segments: [CGPoint] = []
             if role.contains(.first) {
