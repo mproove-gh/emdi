@@ -5,7 +5,8 @@ import SwiftUI
 enum SettingsPane: String, CaseIterable, Identifiable {
     case appearance, fonts, appIcon
 
-    var id: String { rawValue }
+    /// The pane itself: `List(selection:)` tags each row with its `id`, which must have the selection's type.
+    var id: Self { self }
 
     var title: String {
         switch self {

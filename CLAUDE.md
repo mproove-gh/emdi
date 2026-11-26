@@ -94,6 +94,7 @@ open build/Build/Products/Debug/emdi.app                           # run
 
 - `SettingsView` (`emdi/App/SettingsView.swift`) is a `NavigationSplitView`, like System Settings. On the left, `SettingsSidebar` lists the `SettingsPane` cases, each with a colored SF Symbol tile. On the right is the matching pane (`AppearancePane`, `FontsPane`, `AppIconPane`), each a grouped `Form`. To add a section, add a `SettingsPane` case (title, symbol, tint) and its pane view. Each pane owns its `@AppStorage` values and their `onChange` side effects.
 - `AppearancePane` shows the themes as `ThemeThumbnail`s, miniature documents drawn with `EditorPalette.resolve(_:dark:)`, so the previews show the real colors whatever the current appearance.
+- `SettingsPane.id` must be the pane itself, not its raw value: `List(selection:)` tags each row with the element's `id`, and a `String` id never matches a `SettingsPane?` selection, which made clicks in the sidebar do nothing. `SettingsPaneTests` guards this. To check pane switching, select rows of the sidebar's `NSTableView` and read `window.title`.
 - `SettingsView(initialPane:)` lets tests open a given pane. In offscreen captures the macOS 26 glass sidebar comes out blank, so render `SettingsSidebar` on its own to check it.
 
 ## Themes and colors (implemented)
