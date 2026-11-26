@@ -15,22 +15,26 @@ enum MarkdownTheme {
     /// Hidden syntax keeps its characters but takes almost no room and is not drawn.
     static let hiddenFont = NSFont.systemFont(ofSize: 0.01)
 
-    static let paragraphStyle: NSParagraphStyle = {
+    /// Body text spacing, relative to the text size: about 1.6 line height (as in Typora and most
+    /// reading apps) and a clear gap between paragraphs.
+    static func paragraphStyle(for fonts: EditorFonts) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
-        style.lineSpacing = 3
-        style.paragraphSpacing = 6
+        style.lineSpacing = (fonts.size * 0.38).rounded()
+        style.paragraphSpacing = (fonts.size * 0.7).rounded()
         return style
-    }()
+    }
 
     static var baseAttributes: [NSAttributedString.Key: Any] {
-        [.font: EditorFonts().body, .foregroundColor: EditorPalette.text, .paragraphStyle: paragraphStyle]
+        let fonts = EditorFonts()
+        return [.font: fonts.body, .foregroundColor: EditorPalette.text, .paragraphStyle: paragraphStyle(for: fonts)]
     }
 
     static func apply(_ spans: [StyleSpan], to storage: NSTextStorage, selection: NSRange, context: ThemeContext) {
         let length = storage.length
         let fonts = EditorFonts()
         storage.beginEditing()
-        storage.setAttributes([.font: fonts.body, .foregroundColor: EditorPalette.text, .paragraphStyle: paragraphStyle],
+        storage.setAttributes([.font: fonts.body, .foregroundColor: EditorPalette.text,
+                               .paragraphStyle: paragraphStyle(for: fonts)],
                               range: NSRange(location: 0, length: length))
 
         // Blocks first, then inline styles, syntax last so it wins over everything.
@@ -39,13 +43,25 @@ enum MarkdownTheme {
             switch span.kind {
             case .heading(let level):
                 storage.addAttribute(.font, value: fonts.heading(level: level), range: range)
+                emboldenIfNeeded(range, of: storage)
             case .codeBlock:
                 storage.addAttribute(.font, value: fonts.code, range: range)
                 markCodeBlockLines(in: range, of: storage)
             case .blockQuote:
                 storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range)
             case .thematicBreak:
-                storage.addAttribute(.foregroundColor, value: EditorPalette.syntax, range: range)
+                // Drawn as a thin line (`HorizontalRuleLayoutFragment`); the dashes show only while the
+                // caret is on them. The line keeps a normal text height either way.
+                let style = NSMutableParagraphStyle()
+                style.minimumLineHeight = (fonts.size * 1.4).rounded()
+                style.paragraphSpacing = (fonts.size * 0.7).rounded()
+                storage.addAttribute(.paragraphStyle, value: style, range: range)
+                if StyleSpan.isActive(block: span.blockRange, selection: selection) {
+                    storage.addAttribute(.foregroundColor, value: EditorPalette.syntax, range: range)
+                } else {
+                    storage.addAttributes([.font: hiddenFont, .foregroundColor: NSColor.clear, .horizontalRule: true],
+                                          range: range)
+                }
             case .inlineCode:
                 storage.addAttributes([.font: fonts.code, .backgroundColor: codeBackground], range: range)
             case .strong:
@@ -266,7 +282,7 @@ enum MarkdownTheme {
             switch span.kind {
             case .tableRow(let role):
                 storage.removeAttribute(.tableRow, range: span.range)
-                storage.addAttribute(.paragraphStyle, value: paragraphStyle, range: span.range)
+                storage.addAttribute(.paragraphStyle, value: paragraphStyle(for: EditorFonts()), range: span.range)
                 if role.contains(.delimiter) { storage.addAttributes(visible, range: span.range) }
             case .tablePipe:
                 storage.removeAttribute(.tablePipe, range: span.range)
@@ -330,10 +346,44 @@ enum MarkdownTheme {
         }
     }
 
+    /// Makes text bold or italic. Fonts without a bold or italic variant (AppleGothic, for example) get
+    /// a synthesized one instead (thicker strokes, slanted glyphs), so emphasis always shows.
     private static func addTrait(_ trait: NSFontTraitMask, in range: NSRange, of storage: NSTextStorage) {
         storage.enumerateAttribute(.font, in: range) { value, subrange, _ in
-            guard let font = value as? NSFont else { return }
-            storage.addAttribute(.font, value: NSFontManager.shared.convert(font, toHaveTrait: trait), range: subrange)
+            guard let font = value as? NSFont, font.pointSize >= 1 else { return }  // leave hidden syntax alone
+            let manager = NSFontManager.shared
+            let converted = manager.convert(font, toHaveTrait: trait)
+            // Trust the conversion only if it really changed the font (a heavier weight, another face):
+            // for faces with no variant, AppKit may report the trait without changing anything.
+            let isReal = trait == .boldFontMask
+                ? manager.weight(of: converted) > manager.weight(of: font)
+                : converted.fontName != font.fontName && manager.traits(of: converted).contains(.italicFontMask)
+            if isReal {
+                storage.addAttribute(.font, value: converted, range: subrange)
+            } else if trait == .italicFontMask {
+                storage.addAttribute(.font, value: slanted(font), range: subrange)
+            } else {
+                // No bold variant: a negative stroke width fills and outlines the glyphs (faux bold).
+                storage.addAttribute(.strokeWidth, value: -6, range: subrange)
+            }
         }
     }
+
+    /// Faux bold for headings in a font with no bold variant (see `addTrait`).
+    private static func emboldenIfNeeded(_ range: NSRange, of storage: NSTextStorage) {
+        storage.enumerateAttribute(.font, in: range) { value, subrange, _ in
+            guard let font = value as? NSFont, font.pointSize >= 1,
+                  !NSFontManager.shared.traits(of: font).contains(.boldFontMask),
+                  NSFontManager.shared.weight(of: font) < 8 else { return }
+            storage.addAttribute(.strokeWidth, value: -6, range: subrange)
+        }
+    }
+
+    /// Faux italic for fonts with no italic variant: the same font with its glyphs sheared about 11°.
+    private static func slanted(_ font: NSFont) -> NSFont {
+        let size = font.pointSize
+        let matrix = AffineTransform(m11: size, m12: 0, m21: size * 0.2, m22: size, tX: 0, tY: 0)
+        return NSFont(descriptor: font.fontDescriptor.withMatrix(matrix), size: size) ?? font
+    }
+
 }

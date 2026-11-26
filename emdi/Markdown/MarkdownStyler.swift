@@ -42,7 +42,7 @@ struct StyleSpan: Equatable, Sendable {
 
     var dependsOnCaret: Bool {
         switch kind {
-        case .syntax, .tableRow: true
+        case .syntax, .tableRow, .thematicBreak: true
         default: false
         }
     }

@@ -9,6 +9,8 @@ extension NSAttributedString.Key {
     static let tableRow = NSAttributedString.Key("emdi.tableRow")
     /// Set on each hidden `|` of a table. The value is a CGFloat: how far after the pipe its border is drawn.
     static let tablePipe = NSAttributedString.Key("emdi.tablePipe")
+    /// Set on a hidden `---` line, drawn as a rule by `HorizontalRuleLayoutFragment`.
+    static let horizontalRule = NSAttributedString.Key("emdi.horizontalRule")
     /// Set on a paragraph that holds only an image. The value is a `BlockImage`.
     static let blockImage = NSAttributedString.Key("emdi.blockImage")
 }
@@ -31,6 +33,10 @@ final class MarkdownLayoutDelegate: NSObject, NSTextLayoutManagerDelegate {
             let fragment = CodeBlockLayoutFragment(textElement: textElement, range: range)
             fragment.edges = CodeBlockEdges(rawValue: edges)
             return fragment
+        }
+
+        if string.attribute(.horizontalRule, at: 0, effectiveRange: nil) != nil {
+            return HorizontalRuleLayoutFragment(textElement: textElement, range: range)
         }
 
         if let image = string.attribute(.blockImage, at: 0, effectiveRange: nil) as? BlockImage {

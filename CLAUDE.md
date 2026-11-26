@@ -49,6 +49,10 @@ open build/Build/Products/Debug/emdi.app                           # run
 - `CodeBlockLayoutDelegate`, the `NSTextLayoutManagerDelegate`, returns a `CodeBlockLayoutFragment` for those paragraphs. The fragment paints the background across the full text-container width, with rounded outer corners, before drawing the text. Backgrounds are drawn by fragments, never with `.backgroundColor`, which only highlights the glyphs. The delegate is a separate nonisolated object, because a `@MainActor` coordinator can't conform under Swift 6.
 - Copy button: `MarkdownTextView` tracks mouse movement and shows a single `NSButton` at the top right of the hovered block, found through `codeBlockRanges`, which the coordinator sets after each parse. The button copies `CodeBlockText.content(of:)`, the code without its fences or indentation.
 
+## Horizontal rules (implemented)
+
+- A `---` (thematic break) line is hidden, with `.horizontalRule` set on it, and `HorizontalRuleLayoutFragment` draws a 1 px line in `EditorPalette.border` across the text column. While the caret is on it, the dashes show dimmed instead. The line keeps a normal text height (`minimumLineHeight`).
+
 ## Task items and tables (implemented)
 
 - `MarkdownLayoutDelegate` picks the fragment class for each paragraph from attributes that `MarkdownTheme` sets: `.codeBlockEdges` → `CodeBlockLayoutFragment`, `.tableRow` → `TableRowLayoutFragment`, `.taskCheckbox` → `TaskLayoutFragment`. The attribute keys live in `MarkdownLayoutDelegate.swift`.
@@ -111,6 +115,8 @@ open build/Build/Products/Debug/emdi.app                           # run
 
 - The Fonts pane of Settings offers a text font family and size (11–28 pt, default 15) and a code font family. The code picker lists monospaced families first, then all others. Values live in user defaults (`textFontFamily`, `textFontSize`, `codeFontFamily`), and an empty family means the system font (SF Pro, or SF Mono for code).
 - `EditorFonts` (`emdi/Editor/EditorFonts.swift`) builds the real fonts from `FontSettings.current()`. Code is the text size minus 1, headings scale with the text size (28/22/19/17 pt at 15), and a missing family falls back to the system font. `MarkdownTheme.apply` creates one `EditorFonts` per pass. Never hard-code font sizes in the theme or the fragments: `TaskLayoutFragment`, for example, reads the x-height from the item's actual font.
+- Body spacing scales with the text size (`MarkdownTheme.paragraphStyle(for:)`): line spacing about 0.38 × size (≈ 1.6 line height), paragraph spacing 0.7 × size.
+- Bold and italic (`MarkdownTheme.addTrait`) use the font's real variant only if converting actually changed the font: a heavier weight, or another italic face. Some families (AppleGothic, for example) have none, and AppKit may still report the trait. Those get faux bold (`.strokeWidth` -6) and faux italic (the same font with a sheared matrix from `fontDescriptor.withMatrix`; `.obliqueness` is ignored by TextKit 2). Headings in such fonts get the faux bold too. Known limit: bold plus italic in such a font shows only the italic, because the stroke doesn't apply to a sheared font.
 - Every `MarkdownEditorView.Coordinator` observes `UserDefaults.didChangeNotification` and restyles when `FontSettings` changed, so open documents update live.
 - Tests that touch font settings must use a separate `UserDefaults(suiteName:)` or remove the keys afterwards: the test host is the real app, so `UserDefaults.standard` is the user's own emdi preferences.
 
