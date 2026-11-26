@@ -16,9 +16,18 @@ final class TaskLayoutFragment: NSTextLayoutFragment {
         let origin = line.typographicBounds.origin
         let x = origin.x + line.locationForCharacter(at: prefixRange.location).x
         // Centre on the lowercase letters of the body text.
-        let middle = origin.y + line.glyphOrigin.y - MarkdownLayoutMetrics.bodyXHeight / 2
+        let middle = origin.y + line.glyphOrigin.y - textXHeight / 2
         let size = Self.checkboxSize
         return CGRect(x: x, y: middle - size / 2, width: size, height: size)
+    }
+
+    /// x-height of the item's text (the first character after the hidden prefix), whatever font is chosen.
+    private var textXHeight: CGFloat {
+        if let string = (textElement as? NSTextParagraph)?.attributedString, NSMaxRange(prefixRange) < string.length,
+           let font = string.attribute(.font, at: NSMaxRange(prefixRange), effectiveRange: nil) as? NSFont {
+            return font.xHeight
+        }
+        return 7
     }
 
     override var renderingSurfaceBounds: CGRect {
@@ -40,9 +49,4 @@ final class TaskLayoutFragment: NSTextLayoutFragment {
         image.draw(in: checkboxRect.offsetBy(dx: point.x, dy: point.y))
         NSGraphicsContext.restoreGraphicsState()
     }
-}
-
-/// Font metrics the layout fragments need, readable off the main actor.
-enum MarkdownLayoutMetrics {
-    static let bodyXHeight: CGFloat = NSFont.systemFont(ofSize: 15).xHeight
 }

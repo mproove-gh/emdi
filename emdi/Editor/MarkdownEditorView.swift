@@ -68,6 +68,20 @@ struct MarkdownEditorView: NSViewRepresentable {
         private var isEditing = false
         var fileURL: URL?
         private let imageCache = ImageCache()
+        private var fontSettings = FontSettings()
+        private var defaultsObserver: (any NSObjectProtocol)?
+
+        isolated deinit {
+            if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
+        }
+
+        /// Settings changed: restyle with the new fonts if they are what changed.
+        private func fontsMayHaveChanged() {
+            let current = FontSettings.current()
+            guard current != fontSettings else { return }
+            fontSettings = current
+            restyle(force: true)
+        }
         private var lastImageWidth: CGFloat = 0
 
         init(text: Binding<String>) {
@@ -81,6 +95,11 @@ struct MarkdownEditorView: NSViewRepresentable {
             textView.postsFrameChangedNotifications = true
             NotificationCenter.default.addObserver(self, selector: #selector(textViewFrameDidChange),
                                                    name: NSView.frameDidChangeNotification, object: textView)
+            fontSettings = FontSettings.current()
+            defaultsObserver = NotificationCenter.default.addObserver(
+                forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.fontsMayHaveChanged() }
+            }
             reparse()
         }
 

@@ -12,10 +12,6 @@ struct ThemeContext {
 /// Turns style spans into text attributes. Only attributes change: the characters stay the raw Markdown.
 @MainActor
 enum MarkdownTheme {
-    static let bodySize: CGFloat = 15
-
-    static let bodyFont = NSFont.systemFont(ofSize: bodySize)
-    static let monoFont = NSFont.monospacedSystemFont(ofSize: bodySize - 1, weight: .regular)
     /// Hidden syntax keeps its characters but takes almost no room and is not drawn.
     static let hiddenFont = NSFont.systemFont(ofSize: 0.01)
 
@@ -27,34 +23,31 @@ enum MarkdownTheme {
     }()
 
     static var baseAttributes: [NSAttributedString.Key: Any] {
-        [.font: bodyFont, .foregroundColor: NSColor.textColor, .paragraphStyle: paragraphStyle]
-    }
-
-    static func headingFont(level: Int) -> NSFont {
-        let sizes: [CGFloat] = [28, 22, 19, 17, 15, 15]
-        return .systemFont(ofSize: sizes[min(max(level, 1), 6) - 1], weight: level <= 2 ? .bold : .semibold)
+        [.font: EditorFonts().body, .foregroundColor: NSColor.textColor, .paragraphStyle: paragraphStyle]
     }
 
     static func apply(_ spans: [StyleSpan], to storage: NSTextStorage, selection: NSRange, context: ThemeContext) {
         let length = storage.length
+        let fonts = EditorFonts()
         storage.beginEditing()
-        storage.setAttributes(baseAttributes, range: NSRange(location: 0, length: length))
+        storage.setAttributes([.font: fonts.body, .foregroundColor: NSColor.textColor, .paragraphStyle: paragraphStyle],
+                              range: NSRange(location: 0, length: length))
 
         // Blocks first, then inline styles, syntax last so it wins over everything.
         for span in spans.sorted(by: { order($0.kind) < order($1.kind) }) where NSMaxRange(span.range) <= length {
             let range = span.range
             switch span.kind {
             case .heading(let level):
-                storage.addAttribute(.font, value: headingFont(level: level), range: range)
+                storage.addAttribute(.font, value: fonts.heading(level: level), range: range)
             case .codeBlock:
-                storage.addAttribute(.font, value: monoFont, range: range)
+                storage.addAttribute(.font, value: fonts.code, range: range)
                 markCodeBlockLines(in: range, of: storage)
             case .blockQuote:
                 storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
             case .thematicBreak:
                 storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: range)
             case .inlineCode:
-                storage.addAttributes([.font: monoFont, .backgroundColor: codeBackground], range: range)
+                storage.addAttributes([.font: fonts.code, .backgroundColor: codeBackground], range: range)
             case .strong:
                 addTrait(.boldFontMask, in: range, of: storage)
             case .emphasis:
@@ -117,7 +110,7 @@ enum MarkdownTheme {
                     .underlineStyle: 0,
                 ]
                 if active {
-                    attributes[.font] = NSFont.systemFont(ofSize: bodySize - 3)
+                    attributes[.font] = fonts.body.withSize(fonts.size - 3)
                     attributes[.foregroundColor] = NSColor.tertiaryLabelColor
                 } else {
                     attributes[.font] = hiddenFont
@@ -126,7 +119,7 @@ enum MarkdownTheme {
                 storage.addAttributes(attributes, range: range)
             }
         }
-        layOutTables(spans, in: storage, selection: selection, availableWidth: context.availableWidth)
+        layOutTables(spans, in: storage, selection: selection, availableWidth: context.availableWidth, fonts: fonts)
         storage.endEditing()
     }
 
@@ -214,7 +207,7 @@ enum MarkdownTheme {
     /// except while the caret is in it: it is then shown as plain Markdown that wraps, so every cell
     /// can be read and edited.
     private static func layOutTables(_ spans: [StyleSpan], in storage: NSTextStorage, selection: NSRange,
-                                     availableWidth: CGFloat) {
+                                     availableWidth: CGFloat, fonts: EditorFonts) {
         let tables = Dictionary(grouping: spans.filter { span in
             switch span.kind {
             case .tableCell, .tableRow, .tablePipe: NSMaxRange(span.range) <= storage.length
@@ -228,7 +221,7 @@ enum MarkdownTheme {
             if availableWidth > 0, natural > availableWidth {
                 if natural * minimumTableScale > availableWidth,
                    StyleSpan.isActive(block: table, selection: selection) {
-                    showTableAsMarkdown(tableSpans, in: storage)
+                    showTableAsMarkdown(tableSpans, in: storage, font: fonts.body)
                     continue
                 }
                 let scale = max(availableWidth / natural * 0.98, minimumTableScale)
@@ -268,8 +261,8 @@ enum MarkdownTheme {
     }
 
     /// Undoes the grid styling: rows become ordinary paragraphs and the pipes and delimiter row show, dimmed.
-    private static func showTableAsMarkdown(_ spans: [StyleSpan], in storage: NSTextStorage) {
-        let visible: [NSAttributedString.Key: Any] = [.font: bodyFont, .foregroundColor: NSColor.tertiaryLabelColor]
+    private static func showTableAsMarkdown(_ spans: [StyleSpan], in storage: NSTextStorage, font: NSFont) {
+        let visible: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.tertiaryLabelColor]
         for span in spans {
             switch span.kind {
             case .tableRow(let role):

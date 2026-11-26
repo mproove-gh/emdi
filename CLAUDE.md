@@ -87,8 +87,15 @@ open build/Build/Products/Debug/emdi.app                           # run
 ## App icon (implemented)
 
 - The design is serif "eMD" followed by an orange text cursor that stands for the "I". At 32 px and below, only "e" and the cursor are drawn. The icons are **generated**: edit `tools/make-icons.swift` and run `swift tools/make-icons.swift` from the repo root. It writes the default white icon to `emdi/Assets.xcassets/AppIcon.appiconset` and the alternate icon to `emdi/Resources/AppIcon-Anthracite.icns`. Don't edit the PNGs by hand.
-- emdi ▸ Settings (⌘,) is `SettingsView` in `emdi/App/AppIcon.swift`. It stores the choice in the `appIcon` user default (`white` by default, or `anthracite`). `AppIcon.apply` sets `NSApp.applicationIconImage` for the running Dock icon. It also sets the bundle's custom Finder icon with `NSWorkspace.setIcon(_:forFile:)`, which adds an `Icon\r` file to the bundle; a rebuild discards that file, so `AppDelegate` re-applies a non-default choice at launch.
+- The icon choice is the App Icon section of `SettingsView` (`emdi/App/SettingsView.swift`). It stores the choice in the `appIcon` user default (`white` by default, or `anthracite`). `AppIcon.apply` sets `NSApp.applicationIconImage` for the running Dock icon. It also sets the bundle's custom Finder icon with `NSWorkspace.setIcon(_:forFile:)`, which adds an `Icon\r` file to the bundle; a rebuild discards that file, so `AppDelegate` re-applies a non-default choice at launch.
 - To see the icon as the system shows it, render `NSWorkspace.shared.icon(forFile:)` of the built app to a PNG. Running `lsregister -f` on the app first refreshes Launch Services. SwiftUI `Text` doesn't appear in `cacheDisplay` captures; render SwiftUI-only views with `ImageRenderer` instead.
+
+## Fonts (implemented)
+
+- Settings (`emdi/App/SettingsView.swift`, a grouped `Form`) offers a text font family and size (11–28 pt, default 15) and a code font family. The code picker lists monospaced families first, then all others. Values live in user defaults (`textFontFamily`, `textFontSize`, `codeFontFamily`), and an empty family means the system font (SF Pro, or SF Mono for code).
+- `EditorFonts` (`emdi/Editor/EditorFonts.swift`) builds the real fonts from `FontSettings.current()`. Code is the text size minus 1, headings scale with the text size (28/22/19/17 pt at 15), and a missing family falls back to the system font. `MarkdownTheme.apply` creates one `EditorFonts` per pass. Never hard-code font sizes in the theme or the fragments: `TaskLayoutFragment`, for example, reads the x-height from the item's actual font.
+- Every `MarkdownEditorView.Coordinator` observes `UserDefaults.didChangeNotification` and restyles when `FontSettings` changed, so open documents update live.
+- Tests that touch font settings must use a separate `UserDefaults(suiteName:)` or remove the keys afterwards: the test host is the real app, so `UserDefaults.standard` is the user's own emdi preferences.
 
 ## Verifying rendering visually
 
