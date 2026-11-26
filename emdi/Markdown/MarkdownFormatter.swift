@@ -23,7 +23,7 @@ struct Shortcut: Sendable {
 /// The formatting commands shared by the context menu, the Format menu and keyboard shortcuts.
 /// Each one rewrites the Markdown source around the selection and toggles off when already applied.
 enum FormatCommand: String, CaseIterable, Sendable {
-    case bold, italic, strikethrough, inlineCode, link
+    case bold, italic, strikethrough, inlineCode, link, clearFormatting
     case paragraph, heading1, heading2, heading3, heading4, heading5, heading6
     case quote, bulletList, numberedList, taskList, codeBlock
     case table, horizontalRule
@@ -31,7 +31,7 @@ enum FormatCommand: String, CaseIterable, Sendable {
     case insertRowAbove, insertRowBelow, deleteRow
     case alignColumnLeft, alignColumnCenter, alignColumnRight
 
-    static let inlineGroup: [FormatCommand] = [.bold, .italic, .strikethrough, .inlineCode, .link]
+    static let inlineGroup: [FormatCommand] = [.bold, .italic, .strikethrough, .inlineCode, .link, .clearFormatting]
     static let headingGroup: [FormatCommand] = [.paragraph, .heading1, .heading2, .heading3, .heading4, .heading5, .heading6]
     static let blockGroup: [FormatCommand] = [.quote, .bulletList, .numberedList, .taskList, .codeBlock]
     static let insertGroup: [FormatCommand] = [.table, .horizontalRule]
@@ -71,6 +71,7 @@ enum FormatCommand: String, CaseIterable, Sendable {
         case .strikethrough: "Strikethrough"
         case .inlineCode: "Code"
         case .link: "Link"
+        case .clearFormatting: "Clear Formatting"
         case .paragraph: "Paragraph"
         case .heading1: "Heading 1"
         case .heading2: "Heading 2"
@@ -104,6 +105,7 @@ enum FormatCommand: String, CaseIterable, Sendable {
         case .strikethrough: Shortcut(key: "x", modifiers: [.command, .shift])
         case .inlineCode: Shortcut(key: "`", modifiers: .control)
         case .link: Shortcut(key: "k", modifiers: .command)
+        case .clearFormatting: Shortcut(key: "\\", modifiers: .command)
         case .paragraph: Shortcut(key: "0", modifiers: .command)
         case .heading1: Shortcut(key: "1", modifiers: .command)
         case .heading2: Shortcut(key: "2", modifiers: .command)
@@ -135,6 +137,7 @@ enum FormatCommand: String, CaseIterable, Sendable {
         case .strikethrough: return MarkdownFormatter.toggleInline("~~", in: text, selection: selection)
         case .inlineCode: return MarkdownFormatter.toggleInline("`", in: text, selection: selection)
         case .link: return MarkdownFormatter.link(in: text, selection: selection)
+        case .clearFormatting: return MarkdownFormatter.clearFormatting(in: text as String, selection: selection)
         case .paragraph: return MarkdownFormatter.heading(level: 0, in: text, selection: selection)
         case .heading1: return MarkdownFormatter.heading(level: 1, in: text, selection: selection)
         case .heading2: return MarkdownFormatter.heading(level: 2, in: text, selection: selection)
@@ -160,6 +163,86 @@ enum FormatCommand: String, CaseIterable, Sendable {
 }
 
 enum MarkdownFormatter {
+    // MARK: Clear formatting
+
+    /// Removes the Markdown formatting that touches the selection (or the caret): emphasis, strikethrough,
+    /// inline code, links and images (their text is kept), headings, list and task markers, quote markers
+    /// and code block fences. Tables and rules are left as they are. The selection keeps covering the same text.
+    static func clearFormatting(in text: String, selection: NSRange) -> TextEdit {
+        let ns = text as NSString
+        let spans = MarkdownStyler.spans(for: text)
+        func touches(_ range: NSRange) -> Bool {
+            selection.length == 0
+                ? range.location <= selection.location && selection.location <= NSMaxRange(range)
+                : NSIntersectionRange(range, selection).length > 0
+        }
+        let lines = ns.lineRange(for: selection)
+
+        var removals: [NSRange] = []
+        // Inline elements and headings: drop the syntax spans inside each touched element.
+        let elements = spans.filter { span in
+            switch span.kind {
+            case .strong, .emphasis, .strikethrough, .link, .inlineCode, .heading, .codeBlock: touches(span.range)
+            default: false
+            }
+        }
+        for element in elements {
+            for span in spans where span.kind == .syntax
+                && NSIntersectionRange(span.range, element.range).length == span.range.length {
+                removals.append(span.range)
+            }
+        }
+        // Line prefixes on the selected lines: list bullets and numbers, task boxes, quote markers.
+        for span in spans where NSIntersectionRange(span.range, lines).length > 0 {
+            switch span.kind {
+            case .marker, .taskMarker:
+                var range = span.range
+                if NSMaxRange(range) < ns.length, ns.character(at: NSMaxRange(range)) == unichar(UInt8(ascii: " ")),
+                   ns.substring(with: range).hasSuffix(">") {
+                    range.length += 1  // "> " → remove the space after the quote marker too
+                }
+                removals.append(range)
+            default:
+                break
+            }
+        }
+
+        let merged = merge(removals.filter { $0.length > 0 })
+        guard let first = merged.first, let last = merged.last else {
+            return TextEdit(range: NSRange(location: selection.location, length: 0), replacement: "", selection: selection)
+        }
+        let span = NSRange(location: first.location, length: NSMaxRange(last) - first.location)
+        var kept = ""
+        var cursor = span.location
+        for removal in merged {
+            kept += ns.substring(with: NSRange(location: cursor, length: removal.location - cursor))
+            cursor = NSMaxRange(removal)
+        }
+        kept += ns.substring(with: NSRange(location: cursor, length: NSMaxRange(span) - cursor))
+
+        // Map the selection through the removals.
+        func mapped(_ location: Int) -> Int {
+            location - merged.reduce(0) { total, removal in
+                total + max(0, min(location, NSMaxRange(removal)) - removal.location)
+            }
+        }
+        let start = mapped(selection.location)
+        let end = mapped(NSMaxRange(selection))
+        return TextEdit(range: span, replacement: kept, selection: NSRange(location: start, length: max(end - start, 0)))
+    }
+
+    private static func merge(_ ranges: [NSRange]) -> [NSRange] {
+        var result: [NSRange] = []
+        for range in ranges.sorted(by: { $0.location < $1.location }) {
+            if let last = result.last, range.location <= NSMaxRange(last) {
+                result[result.count - 1] = NSUnionRange(last, range)
+            } else {
+                result.append(range)
+            }
+        }
+        return result
+    }
+
     // MARK: Inline
 
     /// Wraps the selection in `marker`, or removes it when the selection is already wrapped
