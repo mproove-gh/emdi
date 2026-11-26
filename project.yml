@@ -1,0 +1,75 @@
+name: emdi
+
+options:
+  bundleIdPrefix: local.emdi
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    ARCHS: arm64
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    # Personal use: ad-hoc "Sign to Run Locally", no team, no sandbox.
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: NO
+
+packages:
+  swift-markdown:
+    url: https://github.com/swiftlang/swift-markdown
+    from: "0.9.0"
+
+targets:
+  emdi:
+    type: application
+    platform: macOS
+    sources: [emdi]
+    dependencies:
+      - package: swift-markdown
+        product: Markdown
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.emdi.app
+        PRODUCT_NAME: emdi
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ENABLE_APP_SANDBOX: NO
+    info:
+      path: emdi/Info.plist
+      properties:
+        CFBundleDisplayName: emdi
+        LSApplicationCategoryType: public.app-category.productivity
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Markdown Document
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Default
+            LSItemContentTypes: [net.daringfireball.markdown]
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: net.daringfireball.markdown
+            UTTypeDescription: Markdown Document
+            UTTypeConformsTo: [public.plain-text]
+            UTTypeTagSpecification:
+              public.filename-extension: [md, markdown, mdown, mkd]
+              public.mime-type: [text/markdown]
+
+  emdiTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [emdiTests]
+    dependencies:
+      - target: emdi
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.emdi.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  emdi:
+    build:
+      targets:
+        emdi: all
+    test:
+      targets: [emdiTests]
