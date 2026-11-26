@@ -78,6 +78,11 @@ open build/Build/Products/Debug/emdi.app                           # run
 - Following items are not renumbered after an insertion in the middle of a numbered list.
 - To simulate typing in a temporary test, call `insertText(_:replacementRange:)` and `insertNewline(nil)` on the text view. All of it lands in one undo group there, unlike real keystrokes.
 
+## Document tabs (implemented)
+
+- Every document opens as a tab of the frontmost emdi window, whatever the system's "Prefer tabs when opening documents" setting says. `DocumentTabsHook` (`emdi/App/DocumentTabs.swift`) is a background view in each document scene. It catches the `NSWindow` in `viewDidMoveToWindow`, and `DocumentTabs.adopt` gives it the `emdi.document` tabbing identifier and joins it to the frontmost visible document window with `addTabbedWindow`.
+- To check this in the running app without Accessibility access, list emdi's layer-0 windows with `CGWindowListCopyWindowInfo` from a small `swift` script. Tabs show up as several windows with the same frame, only one of them on screen.
+
 ## Verifying rendering visually
 
 Screen capture isn't available to Claude here. To check how things look, add a temporary `@MainActor` Swift Testing test. It hosts `MarkdownEditorView` in an `NSHostingView` inside an offscreen `NSWindow`, renders it with `bitmapImageRepForCachingDisplay` / `cacheDisplay(in:to:)`, and writes a PNG to the scratchpad. Run it with `-only-testing`, look at the PNG, then delete the test. Hover states can be triggered by calling `mouseMoved(with:)` with a synthesized event.
