@@ -42,6 +42,11 @@ targets:
       path: emdi/Info.plist
       properties:
         CFBundleDisplayName: emdi
+        # Versions come from MARKETING_VERSION / CURRENT_PROJECT_VERSION above.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Shown under the version in emdi ▸ About emdi.
+        NSHumanReadableCopyright: Built by XToF with Claude and love
         LSApplicationCategoryType: public.app-category.productivity
         CFBundleDocumentTypes:
           - CFBundleTypeName: Markdown Document

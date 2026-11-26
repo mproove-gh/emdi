@@ -32,7 +32,7 @@ xcodebuild -scheme emdi -derivedDataPath build test -only-testing:emdiTests/Mark
 open build/Build/Products/Debug/emdi.app                           # run
 ```
 
-- `emdi/Info.plist` is generated from the `info:` section of `project.yml`, so edit document types and other plist keys there.
+- `emdi/Info.plist` is generated from the `info:` section of `project.yml`, so edit document types and other plist keys there. The About panel's credit line is `NSHumanReadableCopyright`. The version shown there comes from `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` through `$(…)` references in `info:`, so bump those settings, not the plist.
 - Tests use Swift Testing (`import Testing`, `@Test`, `#expect`), not XCTest.
 - Sources are grouped by role: `emdi/App`, `emdi/Document`, `emdi/Markdown` (pure parsing, no AppKit) and `emdi/Editor` (AppKit). New files are picked up after `xcodegen generate`.
 
