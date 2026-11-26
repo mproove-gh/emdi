@@ -167,6 +167,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             guard let textView = notification.object as? NSTextView else { return }
             text.wrappedValue = textView.string
             reparse()
+            DocumentSaving.saveSoon(textView.window)
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

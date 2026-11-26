@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The sections of emdi ▸ Settings… (⌘,), listed in the sidebar.
 enum SettingsPane: String, CaseIterable, Identifiable {
-    case appearance, fonts, appIcon
+    case appearance, fonts, editing, appIcon
 
     /// The pane itself: `List(selection:)` tags each row with its `id`, which must have the selection's type.
     var id: Self { self }
@@ -12,6 +12,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         switch self {
         case .appearance: "Appearance"
         case .fonts: "Fonts"
+        case .editing: "Editing"
         case .appIcon: "App Icon"
         }
     }
@@ -20,6 +21,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         switch self {
         case .appearance: "circle.lefthalf.filled"
         case .fonts: "textformat"
+        case .editing: "square.and.pencil"
         case .appIcon: "app.badge"
         }
     }
@@ -28,6 +30,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         switch self {
         case .appearance: .blue
         case .fonts: .indigo
+        case .editing: .green
         case .appIcon: .orange
         }
     }
@@ -52,6 +55,7 @@ struct SettingsView: View {
                 switch selection ?? .appearance {
                 case .appearance: AppearancePane()
                 case .fonts: FontsPane()
+                case .editing: EditingPane()
                 case .appIcon: AppIconPane()
                 }
             }
@@ -249,6 +253,28 @@ private struct FontsPane: View {
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Font preview")
+    }
+}
+
+// MARK: - Editing
+
+private struct EditingPane: View {
+    @AppStorage(DocumentSaving.autosaveKey) private var autosave = false
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Save automatically while typing", isOn: $autosave)
+            } header: {
+                Text("Saving")
+            } footer: {
+                Text(autosave
+                     ? "Each change is written to the file about a second after you stop typing, and closing a document saves it without asking. Untitled documents are saved once you give them a name."
+                     : "Changes are saved when you choose File ▸ Save (⌘S). Closing a document with unsaved changes asks whether to save them.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 
