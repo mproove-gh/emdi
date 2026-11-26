@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 /// Carries a `FormatCommand` through the responder chain from the SwiftUI Format menu.
 final class FormatCommandSender: NSObject {
@@ -146,6 +147,44 @@ final class MarkdownTextView: NSTextView {
             return
         }
         super.deleteBackward(sender)
+    }
+
+    // MARK: Dropping images
+
+    /// The document's file, set by the coordinator, so dropped images get a relative path.
+    var documentURL: URL?
+
+    private static let imageReadingOptions: [NSPasteboard.ReadingOptionKey: Any] = [
+        .urlReadingFileURLsOnly: true,
+        .urlReadingContentsConformToTypes: [UTType.image.identifier],
+    ]
+
+    private func droppedImageURLs(_ info: any NSDraggingInfo) -> [URL] {
+        info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: Self.imageReadingOptions) as? [URL] ?? []
+    }
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        droppedImageURLs(sender).isEmpty ? super.draggingEntered(sender) : .copy
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        let operation = super.draggingUpdated(sender)  // keeps the drop caret moving with the pointer
+        return droppedImageURLs(sender).isEmpty ? operation : .copy
+    }
+
+    /// Image files become `![name](path)` paragraphs at the drop point; anything else is handled normally.
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        let images = droppedImageURLs(sender)
+        guard !images.isEmpty, isEditable else { return super.performDragOperation(sender) }
+        let markdown = images.map { ImageSource.markdown(forImageAt: $0, relativeTo: documentURL) }
+            .joined(separator: "\n\n") + "\n"
+        let location = characterIndexForInsertion(at: convert(sender.draggingLocation, from: nil))
+        let end = (markdown as NSString).length - 1
+        let edit = MarkdownFormatter.insertBlock(markdown, select: NSRange(location: end, length: 0),
+                                                 in: string as NSString, selection: NSRange(location: location, length: 0))
+        window?.makeFirstResponder(self)
+        apply(edit, actionName: images.count == 1 ? "Insert Image" : "Insert Images")
+        return true
     }
 
     // MARK: List editing

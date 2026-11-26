@@ -48,6 +48,7 @@ struct MarkdownEditorView: NSViewRepresentable {
         context.coordinator.text = $text
         if context.coordinator.fileURL != fileURL {
             context.coordinator.fileURL = fileURL  // Saved under a new name: relative images may resolve differently.
+            (scrollView.documentView as? MarkdownTextView)?.documentURL = fileURL
             context.coordinator.reparse()
         }
         guard let textView = scrollView.documentView as? NSTextView, textView.string != text else { return }
@@ -75,6 +76,8 @@ struct MarkdownEditorView: NSViewRepresentable {
 
         func attach(_ textView: MarkdownTextView) {
             self.textView = textView
+            textView.documentURL = fileURL
+            textView.registerForDraggedTypes([.fileURL])
             textView.postsFrameChangedNotifications = true
             NotificationCenter.default.addObserver(self, selector: #selector(textViewFrameDidChange),
                                                    name: NSView.frameDidChangeNotification, object: textView)

@@ -63,6 +63,7 @@ open build/Build/Products/Debug/emdi.app                           # run
 - `ImageCache` (in `MarkdownEditorView.swift`) reloads an image when its file's modification date changes, and doesn't cache missing files.
 - `MarkdownTheme` scales the image to the text width (never up), puts a `BlockImage` in `.blockImage`, and reserves the height with `paragraphSpacingBefore`. `ImageLayoutFragment` draws the image in that space. The `![alt](path)` line is hidden, and shown small and dimmed while the caret is in it.
 - The coordinator restyles when the text view's width changes, but only if the document has block images.
+- Dropping image files onto the editor (`MarkdownTextView.performDragOperation`) inserts one `![name](path)` paragraph per image at the drop point, through `MarkdownFormatter.insertBlock`. `ImageSource.markdown(forImageAt:relativeTo:)` builds the path: relative to the document folder (`../` allowed) when the document is saved, absolute when it isn't or when the image is on another volume, and `<…>` around paths with spaces or parentheses. Files are referenced where they are, not copied. Other drops keep NSTextView's default behaviour.
 
 ## Code highlighting (implemented)
 
