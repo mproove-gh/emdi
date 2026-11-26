@@ -37,6 +37,15 @@ enum EditorPalette {
         }
     }
 
+    /// The light or dark value of a palette color, whatever the current appearance (used by the theme previews).
+    static func resolve(_ color: NSColor, dark: Bool) -> NSColor {
+        var resolved = color
+        NSAppearance(named: dark ? .darkAqua : .aqua)?.performAsCurrentDrawingAppearance {
+            resolved = color.usingColorSpace(.sRGB) ?? color
+        }
+        return resolved
+    }
+
     private static func color(_ hex: UInt32) -> NSColor {
         NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
                 blue: CGFloat(hex & 0xFF) / 255, alpha: 1)

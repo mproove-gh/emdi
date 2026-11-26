@@ -87,18 +87,24 @@ open build/Build/Products/Debug/emdi.app                           # run
 ## App icon (implemented)
 
 - The design is serif "eMD" followed by an orange text cursor that stands for the "I". At 32 px and below, only "e" and the cursor are drawn. The icons are **generated**: edit `tools/make-icons.swift` and run `swift tools/make-icons.swift` from the repo root. It writes the default white icon to `emdi/Assets.xcassets/AppIcon.appiconset` and the alternate icon to `emdi/Resources/AppIcon-Anthracite.icns`. Don't edit the PNGs by hand.
-- The icon choice is the App Icon section of `SettingsView` (`emdi/App/SettingsView.swift`). It stores the choice in the `appIcon` user default (`white` by default, or `anthracite`). `AppIcon.apply` sets `NSApp.applicationIconImage` for the running Dock icon. It also sets the bundle's custom Finder icon with `NSWorkspace.setIcon(_:forFile:)`, which adds an `Icon\r` file to the bundle; a rebuild discards that file, so `AppDelegate` re-applies a non-default choice at launch.
+- The icon choice is the App Icon pane of Settings (`AppIconPane` in `emdi/App/SettingsView.swift`). It stores the choice in the `appIcon` user default (`white` by default, or `anthracite`). `AppIcon.apply` sets `NSApp.applicationIconImage` for the running Dock icon. It also sets the bundle's custom Finder icon with `NSWorkspace.setIcon(_:forFile:)`, which adds an `Icon\r` file to the bundle; a rebuild discards that file, so `AppDelegate` re-applies a non-default choice at launch.
 - To see the icon as the system shows it, render `NSWorkspace.shared.icon(forFile:)` of the built app to a PNG. Running `lsregister -f` on the app first refreshes Launch Services. SwiftUI `Text` doesn't appear in `cacheDisplay` captures; render SwiftUI-only views with `ImageRenderer` instead.
+
+## Settings window (implemented)
+
+- `SettingsView` (`emdi/App/SettingsView.swift`) is a `NavigationSplitView`, like System Settings. On the left, `SettingsSidebar` lists the `SettingsPane` cases, each with a colored SF Symbol tile. On the right is the matching pane (`AppearancePane`, `FontsPane`, `AppIconPane`), each a grouped `Form`. To add a section, add a `SettingsPane` case (title, symbol, tint) and its pane view. Each pane owns its `@AppStorage` values and their `onChange` side effects.
+- `AppearancePane` shows the themes as `ThemeThumbnail`s, miniature documents drawn with `EditorPalette.resolve(_:dark:)`, so the previews show the real colors whatever the current appearance.
+- `SettingsView(initialPane:)` lets tests open a given pane. In offscreen captures the macOS 26 glass sidebar comes out blank, so render `SettingsSidebar` on its own to check it.
 
 ## Themes and colors (implemented)
 
 - Every editor color comes from `EditorPalette` (`emdi/Editor/EditorPalette.swift`). Each color is a dynamic `NSColor` with a light and a dark value that resolves at draw time. Never use system colors such as `NSColor.textColor`, `.systemPink` or `.separatorColor` in the theme or the fragments. Light is warm paper (#FBFAF7) with near-black ink, dark a soft charcoal (#1D1D1F) with off-white text. The emdi orange is reserved for the insertion point. Code colors follow Xcode's default themes.
 - `EditorPaletteTests` enforce WCAG contrast: body text at least 12:1, and secondary text, links and every code color at least 4.5:1 on their background, in both appearances. Run them after changing any color. Revealed syntax (`EditorPalette.syntax`) is deliberately quieter and is not checked.
-- The Appearance section of Settings sets `AppearanceChoice` (`system`, `light`, `dark`; user default `appearance`). `apply()` sets `NSApp.appearance`, and `AppDelegate` applies it at launch. Because the colors are dynamic, switching needs no restyle.
+- The Appearance pane of Settings sets `AppearanceChoice` (`system`, `light`, `dark`; user default `appearance`). `apply()` sets `NSApp.appearance`, and `AppDelegate` applies it at launch. Because the colors are dynamic, switching needs no restyle.
 
 ## Fonts (implemented)
 
-- Settings (`emdi/App/SettingsView.swift`, a grouped `Form`) offers a text font family and size (11–28 pt, default 15) and a code font family. The code picker lists monospaced families first, then all others. Values live in user defaults (`textFontFamily`, `textFontSize`, `codeFontFamily`), and an empty family means the system font (SF Pro, or SF Mono for code).
+- The Fonts pane of Settings offers a text font family and size (11–28 pt, default 15) and a code font family. The code picker lists monospaced families first, then all others. Values live in user defaults (`textFontFamily`, `textFontSize`, `codeFontFamily`), and an empty family means the system font (SF Pro, or SF Mono for code).
 - `EditorFonts` (`emdi/Editor/EditorFonts.swift`) builds the real fonts from `FontSettings.current()`. Code is the text size minus 1, headings scale with the text size (28/22/19/17 pt at 15), and a missing family falls back to the system font. `MarkdownTheme.apply` creates one `EditorFonts` per pass. Never hard-code font sizes in the theme or the fragments: `TaskLayoutFragment`, for example, reads the x-height from the item's actual font.
 - Every `MarkdownEditorView.Coordinator` observes `UserDefaults.didChangeNotification` and restyles when `FontSettings` changed, so open documents update live.
 - Tests that touch font settings must use a separate `UserDefaults(suiteName:)` or remove the keys afterwards: the test host is the real app, so `UserDefaults.standard` is the user's own emdi preferences.
@@ -132,3 +138,4 @@ Known v1 limits: the whole document is re-parsed and restyled on each edit, whic
 - Do not add `WKWebView`, Electron or any JavaScript runtime. Rendering is native TextKit.
 - Every third-party dependency must justify its weight. swift-markdown is the only planned one.
 - Keep the UI minimal: one document window and the standard macOS menus.
+
