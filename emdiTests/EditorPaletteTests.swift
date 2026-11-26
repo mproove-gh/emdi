@@ -42,7 +42,9 @@ struct EditorPaletteTests {
     }
 
     @Test func lightAndDarkReallyDiffer() {
-        #expect(luminance(resolved(EditorPalette.background, .aqua)) > 0.9)
+        // Light is clearly light but not glaring (bright white tires the eyes).
+        let light = luminance(resolved(EditorPalette.background, .aqua))
+        #expect(light > 0.8 && light < 0.9)
         #expect(luminance(resolved(EditorPalette.background, .darkAqua)) < 0.05)
     }
 }

@@ -107,7 +107,7 @@ open build/Build/Products/Debug/emdi.app                           # run
 
 ## Themes and colors (implemented)
 
-- Every editor color comes from `EditorPalette` (`emdi/Editor/EditorPalette.swift`). Each color is a dynamic `NSColor` with a light and a dark value that resolves at draw time. Never use system colors such as `NSColor.textColor`, `.systemPink` or `.separatorColor` in the theme or the fragments. Light is warm paper (#FBFAF7) with near-black ink, dark a soft charcoal (#1D1D1F) with off-white text. The emdi orange is reserved for the insertion point. Code colors follow Xcode's default themes.
+- Every editor color comes from `EditorPalette` (`emdi/Editor/EditorPalette.swift`). Each color is a dynamic `NSColor` with a light and a dark value that resolves at draw time. Never use system colors such as `NSColor.textColor`, `.systemPink` or `.separatorColor` in the theme or the fragments. Light is soft, warm paper (#F1EEE7, deliberately not bright: `EditorPaletteTests` keeps its luminance between 0.8 and 0.9) with near-black ink, dark a soft charcoal (#1D1D1F) with off-white text. The emdi orange is reserved for the insertion point. Code colors follow Xcode's default themes.
 - `EditorPaletteTests` enforce WCAG contrast: body text at least 12:1, and secondary text, links and every code color at least 4.5:1 on their background, in both appearances. Run them after changing any color. Revealed syntax (`EditorPalette.syntax`) is deliberately quieter and is not checked.
 - The Appearance pane of Settings sets `AppearanceChoice` (`system`, `light`, `dark`; user default `appearance`). `apply()` sets `NSApp.appearance`, and `AppDelegate` applies it at launch. Because the colors are dynamic, switching needs no restyle.
 
