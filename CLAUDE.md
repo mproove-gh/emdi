@@ -110,6 +110,12 @@ open build/Build/Products/Debug/emdi.app                           # run
 - Every `MarkdownEditorView.Coordinator` observes `UserDefaults.didChangeNotification` and restyles when `FontSettings` changed, so open documents update live.
 - Tests that touch font settings must use a separate `UserDefaults(suiteName:)` or remove the keys afterwards: the test host is the real app, so `UserDefaults.standard` is the user's own emdi preferences.
 
+## Closing documents and quitting (implemented)
+
+- No silent autosave: closing a modified document, or quitting, asks Save / Don't Save / Cancel. SwiftUI's `DocumentGroup` document class (`FileWrapperPlatformDocument`) autosaves in place and has no API to change that, so `DocumentSaving` (`emdi/App/DocumentClosing.swift`) overrides its `autosavesInPlace` with the Objective-C runtime to return false. This happens when the first document window is adopted (`DocumentTabs.adopt`). Saving after the override was checked by hand in the real app.
+- `LastDocumentQuitter.shared`, started by `AppDelegate`, quits emdi when the last document window closes, so a lone Settings window never stays behind. Its `terminate` closure is replaceable for tests.
+- Testing caveat: an `NSDocument` only becomes "edited" when its undo group closes at the end of a real event. Calling `insertText` from a test doesn't mark it, and ending the undo group by hand corrupts the undo manager (exception at the next click). The close-and-save flow is best checked by hand.
+
 ## Verifying rendering visually
 
 Screen capture isn't available to Claude here. To check how things look, add a temporary `@MainActor` Swift Testing test. It hosts `MarkdownEditorView` in an `NSHostingView` inside an offscreen `NSWindow`, renders it with `bitmapImageRepForCachingDisplay` / `cacheDisplay(in:to:)`, and writes a PNG to the scratchpad. Run it with `-only-testing`, look at the PNG, then delete the test. Hover states can be triggered by calling `mouseMoved(with:)` with a synthesized event.

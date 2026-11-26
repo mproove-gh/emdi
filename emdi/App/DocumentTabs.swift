@@ -10,6 +10,7 @@ enum DocumentTabs {
     static func adopt(_ window: NSWindow) {
         window.tabbingIdentifier = identifier
         window.tabbingMode = .preferred
+        DocumentSaving.askBeforeDiscardingChanges(in: window)
 
         // Join the frontmost visible document window, unless this one is already in its tab group.
         let others = NSApp.orderedWindows.filter {
