@@ -139,6 +139,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             guard let textView, !textView.hasMarkedText() else { return }
             spans = MarkdownStyler.spans(for: textView.string)
             textView.codeBlockRanges = spans.filter { $0.kind == .codeBlock }.map(\.range)
+            textView.tableCells = spans.filter { if case .tableCell = $0.kind { true } else { false } }
             textView.taskPrefixRanges = spans.compactMap { span in
                 if case .taskMarker = span.kind { span.range } else { nil }
             }

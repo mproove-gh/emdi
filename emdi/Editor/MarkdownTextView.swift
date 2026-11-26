@@ -197,7 +197,25 @@ final class MarkdownTextView: NSTextView {
         }
     }
 
+    /// Table cells (`.tableCell` spans), set by the coordinator after each parse, for Tab navigation.
+    var tableCells: [StyleSpan] = []
+
+    /// Tab / Shift-Tab in a table: move between cells (or add a row), never insert a tab character.
+    private func moveInTable(backwards: Bool) -> Bool {
+        guard !hasMarkedText(), isEditable,
+              let edit = TableEditing.tab(in: string as NSString, cells: tableCells, selection: selectedRange(),
+                                          backwards: backwards) else { return false }
+        if edit.replacement.isEmpty && edit.range.length == 0 {
+            setSelectedRange(edit.selection)
+            scrollRangeToVisible(edit.selection)
+        } else {
+            apply(edit, actionName: "Add Row")
+        }
+        return true
+    }
+
     override func insertTab(_ sender: Any?) {
+        if moveInTable(backwards: false) { return }
         if let edit = listEdit(ListEditing.indent) {
             apply(edit, actionName: "Indent")
         } else {
@@ -206,6 +224,7 @@ final class MarkdownTextView: NSTextView {
     }
 
     override func insertBacktab(_ sender: Any?) {
+        if moveInTable(backwards: true) { return }
         if let edit = listEdit(ListEditing.outdent) {
             apply(edit, actionName: "Outdent")
         } else {
