@@ -84,10 +84,14 @@ struct MarkdownEditorView: NSViewRepresentable {
             reparse()
         }
 
-        /// Images are sized to the text width, so re-lay them out when the window is resized.
+        /// Images and tables are fitted to the text width, so re-lay them out when the window is resized.
         @objc private func textViewFrameDidChange(_ notification: Notification) {
-            guard imageWidth != lastImageWidth,
-                  spans.contains(where: { if case .blockImage = $0.kind { true } else { false } }) else { return }
+            guard imageWidth != lastImageWidth, spans.contains(where: { span in
+                switch span.kind {
+                case .blockImage, .tableRow: true
+                default: false
+                }
+            }) else { return }
             restyle(force: true)
         }
 
@@ -96,12 +100,12 @@ struct MarkdownEditorView: NSViewRepresentable {
             return max(container.size.width - 2 * container.lineFragmentPadding, 0)
         }
 
-        private var imageLookup: ImageLookup {
+        private var themeContext: ThemeContext {
             let width = imageWidth
             guard width > 0 else { return .none }
             let documentURL = fileURL
             let cache = imageCache
-            return ImageLookup(maxWidth: width) { source in
+            return ThemeContext(availableWidth: width) { source in
                 ImageSource.resolve(source, relativeTo: documentURL).flatMap(cache.image(at:))
             }
         }
@@ -124,7 +128,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             guard force || active != activeBlocks else { return }
             activeBlocks = active
             lastImageWidth = imageWidth
-            MarkdownTheme.apply(spans, to: storage, selection: selection, images: imageLookup)
+            MarkdownTheme.apply(spans, to: storage, selection: selection, context: themeContext)
             textView.typingAttributes = MarkdownTheme.baseAttributes
         }
 

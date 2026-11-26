@@ -40,6 +40,13 @@ struct StyleSpan: Equatable, Sendable {
     /// The leaf block (paragraph, heading, code block, …) the span belongs to.
     var blockRange: NSRange
 
+    var dependsOnCaret: Bool {
+        switch kind {
+        case .syntax, .tableRow: true
+        default: false
+        }
+    }
+
     /// A block is active, showing its syntax, when the selection touches it.
     static func isActive(block: NSRange, selection: NSRange) -> Bool {
         selection.location <= NSMaxRange(block) && NSMaxRange(selection) >= block.location
@@ -60,10 +67,11 @@ enum TableAlignment: Equatable, Sendable {
 }
 
 extension Array where Element == StyleSpan {
-    /// The distinct blocks with syntax that the selection currently reveals.
+    /// The distinct blocks whose look depends on the caret (syntax to reveal, tables) that the selection is in.
+    /// The editor restyles when this changes.
     func activeSyntaxBlocks(for selection: NSRange) -> [NSRange] {
         var blocks: [NSRange] = []
-        for span in self where span.kind == .syntax
+        for span in self where span.dependsOnCaret
             && StyleSpan.isActive(block: span.blockRange, selection: selection)
             && blocks.last != span.blockRange {
             blocks.append(span.blockRange)

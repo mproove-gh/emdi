@@ -29,6 +29,14 @@ final class TableRowLayoutFragment: NSTextLayoutFragment {
     }
 
     override func draw(at point: CGPoint, in context: CGContext) {
+        // A table too wide even when shrunk is clipped (see `MarkdownTheme.clipRows`): stop it at the text
+        // column's edge rather than in the margin.
+        context.saveGState()
+        defer { context.restoreGState() }
+        if let containerWidth = textLayoutManager?.textContainer?.size.width {
+            let left = point.x - layoutFragmentFrame.minX
+            context.clip(to: CGRect(x: left - 2, y: point.y - 20, width: containerWidth + 3, height: layoutFragmentFrame.height + 40))
+        }
         if let grid {
             let rect = grid.rect.offsetBy(dx: point.x, dy: point.y)
             context.saveGState()
