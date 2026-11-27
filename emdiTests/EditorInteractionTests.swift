@@ -247,15 +247,42 @@ struct EditorInteractionTests {
         pasteboard.setData(bitmap.representation(using: .png, properties: [:]), forType: .png)
 
         #expect(host.textView.pasteImage(from: pasteboard))
-        let saved = try FileManager.default.contentsOfDirectory(at: folder.appending(path: "images"), includingPropertiesForKeys: nil)
+        let saved = try FileManager.default.contentsOfDirectory(at: folder.appending(path: "doc_images"), includingPropertiesForKeys: nil)
         #expect(saved.count == 1)
         let name = try #require(saved.first?.lastPathComponent)
-        #expect(host.textView.string.contains("](images/\(name))"))
+        #expect(host.textView.string.contains("](doc_images/\(name))"))
 
         // Text on the pasteboard is pasted as text, not as an image.
         pasteboard.declareTypes([.string, .png], owner: nil)
         pasteboard.setString("hello", forType: .string)
         #expect(!host.textView.pasteImage(from: pasteboard))
+    }
+
+    @Test func pastedTemporaryImageFilesAreCopiedNextToTheDocument() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "emdi-copy-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 3, bitsPerSample: 8, samplesPerPixel: 4,
+                                      hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        let captures = FileManager.default.temporaryDirectory.appending(path: "emdi-captures-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: captures, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: captures) }
+        let capture = captures.appending(path: "Capture 1@2x.png")
+        try #require(bitmap.representation(using: .png, properties: [:])).write(to: capture)
+
+        let host = try EditorTestHost(text: "Before.\n")
+        defer { host.close() }
+        host.textView.documentURL = folder.appending(path: "My notes.md")
+        host.textView.setSelectedRange(NSRange(location: 8, length: 0))
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("emdi-test-\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+        pasteboard.writeObjects([capture as NSURL])
+
+        #expect(host.textView.pasteImage(from: pasteboard))
+        let copy = folder.appending(path: "My notes_images/Capture 1@2x.png")
+        #expect(FileManager.default.fileExists(atPath: copy.path))
+        #expect(host.textView.string.contains("](<My notes_images/Capture 1@2x.png>)"))
     }
 
     @Test func commandClickingAnAnchorLinkMovesToItsHeading() throws {

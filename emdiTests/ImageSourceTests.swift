@@ -55,4 +55,26 @@ struct ImageDropTests {
         #expect(ImageSource.pastedImageURL(in: folder, date: date) { taken.contains($0.lastPathComponent) }
             .lastPathComponent == "image-20260304-050607-3.png")
     }
+
+    @Test func pastedImagesGoInAFolderNamedAfterTheDocument() {
+        #expect(ImageSource.imagesFolder(for: URL(fileURLWithPath: "/a/My notes.md")).path == "/a/My notes_images")
+        #expect(ImageSource.imagesFolder(for: URL(fileURLWithPath: "/a/readme.markdown")).lastPathComponent == "readme_images")
+    }
+
+    @Test func filesOtherAppsKeepForAWhileAreTransient() {
+        let home = URL(fileURLWithPath: "/Users/me")
+        #expect(ImageSource.isTransient(URL(fileURLWithPath: "/Users/me/Library/Application Support/CleanShot/media/x.png"), home: home))
+        #expect(ImageSource.isTransient(URL(fileURLWithPath: "/private/var/folders/ab/T/shot.png"), home: home))
+        #expect(ImageSource.isTransient(URL(fileURLWithPath: "/tmp/shot.png"), home: home))
+        #expect(!ImageSource.isTransient(URL(fileURLWithPath: "/Users/me/Pictures/cat.png"), home: home))
+        #expect(!ImageSource.isTransient(URL(fileURLWithPath: "/Users/me/LibraryBooks/cat.png"), home: home))
+    }
+
+    @Test func copiesKeepTheNameAndAvoidTakenOnes() {
+        let folder = URL(fileURLWithPath: "/a/doc_images")
+        let file = URL(fileURLWithPath: "/tmp/CleanShot 1@2x.png")
+        #expect(ImageSource.copyURL(for: file, in: folder) { _ in false }.lastPathComponent == "CleanShot 1@2x.png")
+        #expect(ImageSource.copyURL(for: file, in: folder) { $0.lastPathComponent == "CleanShot 1@2x.png" }
+            .lastPathComponent == "CleanShot 1@2x-2.png")
+    }
 }

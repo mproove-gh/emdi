@@ -337,12 +337,39 @@ final class MarkdownTextView: NSTextView {
 
     /// One `![name](path)` paragraph per image file, at `location`, as one undoable edit.
     private func insertImages(_ images: [URL], at location: Int, actionName: String) {
+        let images = images.compactMap(keepingTransientImage)
+        guard !images.isEmpty else { return }
         let markdown = images.map { ImageSource.markdown(forImageAt: $0, relativeTo: documentURL) }
             .joined(separator: "\n\n") + "\n"
         let end = (markdown as NSString).length - 1
         let edit = MarkdownFormatter.insertBlock(markdown, select: NSRange(location: end, length: 0),
                                                  in: string as NSString, selection: NSRange(location: location, length: 0))
         apply(edit, actionName: actionName)
+    }
+
+    /// A file that another app keeps only for a while (a CleanShot capture, a temporary file) is
+    /// copied into the document's images folder, so the document doesn't lose it. Other files, and
+    /// any file while the document is unsaved, are referenced where they are. Nil if copying failed.
+    private func keepingTransientImage(_ file: URL) -> URL? {
+        guard let documentURL, ImageSource.isTransient(file) else { return file }
+        // Already next to the document (or under its folder): nothing to keep safe.
+        let documentFolder = documentURL.deletingLastPathComponent().standardizedFileURL.resolvingSymlinksInPath().path + "/"
+        guard !file.standardizedFileURL.resolvingSymlinksInPath().path.hasPrefix(documentFolder) else { return file }
+        let folder = ImageSource.imagesFolder(for: documentURL)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let copy = ImageSource.copyURL(for: file, in: folder) { FileManager.default.fileExists(atPath: $0.path) }
+            try FileManager.default.copyItem(at: file, to: copy)
+            return copy
+        } catch {
+            presentImageError(error)
+            return nil
+        }
+    }
+
+    private func presentImageError(_ error: Error) {
+        let alert = NSAlert(error: error)
+        if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
     }
 
     // MARK: Pasting images
@@ -356,9 +383,9 @@ final class MarkdownTextView: NSTextView {
         super.paste(sender)
     }
 
-    /// Image files copied in the Finder are referenced where they are, like dropped ones. Image data
-    /// (a screenshot, an image copied in a browser) is saved as a PNG in an `images` folder next to the
-    /// document, then referenced. Returns false when the pasteboard holds no image, or holds text.
+    /// Image files copied in the Finder are referenced where they are, like dropped ones (or copied,
+    /// when temporary). Image data (a screenshot, an image copied in a browser) is saved as a PNG in
+    /// the document's `<name>_images` folder, then referenced. Returns false when the pasteboard holds no image, or holds text.
     func pasteImage(from pasteboard: NSPasteboard) -> Bool {
         let files = pasteboard.readObjects(forClasses: [NSURL.self], options: Self.imageReadingOptions) as? [URL] ?? []
         if !files.isEmpty {
@@ -369,19 +396,18 @@ final class MarkdownTextView: NSTextView {
         guard let documentURL else {
             let alert = NSAlert()
             alert.messageText = "Save the document first"
-            alert.informativeText = "emdi saves pasted images in an “images” folder next to the document, so the document needs a place on disk."
+            alert.informativeText = "emdi saves pasted images in a folder next to the document, so the document needs a place on disk."
             if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
             return true
         }
-        let folder = documentURL.deletingLastPathComponent().appending(path: "images")
+        let folder = ImageSource.imagesFolder(for: documentURL)
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             let url = ImageSource.pastedImageURL(in: folder, date: Date()) { FileManager.default.fileExists(atPath: $0.path) }
             try data.write(to: url, options: .withoutOverwriting)
             insertImages([url], at: selectedRange().location, actionName: "Paste Image")
         } catch {
-            let alert = NSAlert(error: error)
-            if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+            presentImageError(error)
         }
         return true
     }

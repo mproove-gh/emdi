@@ -422,7 +422,7 @@ Vivamus facilisis diam at odio. Mauris dictum, nisi eget consequat elementum, la
 - [ ] Press Tab in a table to move from cell to cell, and in the last cell to add a row
 - [ ] Right-click in a table and use the Table submenu
 - [ ] Drop an image file from the Finder onto the editor
-- [ ] Paste a screenshot (⌘V): it is saved in images/ next to this file
+- [ ] Paste a screenshot (⌘V): it is saved in showcase_images/ next to this file
 - [ ] Double-click an image to open it in Quick Look
 - [ ] ⌘-click a link to open it, or this one to jump to [the tables](#6-tables)
 - [ ] Switch between light and dark mode, and change fonts in Settings

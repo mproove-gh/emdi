@@ -30,6 +30,38 @@ enum ImageSource {
         return "![\(name)](\(needsBrackets ? "<\(path)>" : path))"
     }
 
+    /// The folder that holds a document's pasted images: next to it, named after it with an
+    /// `_images` suffix (`notes.md` → `notes_images`).
+    static func imagesFolder(for documentURL: URL) -> URL {
+        let name = documentURL.deletingPathExtension().lastPathComponent
+        return documentURL.deletingLastPathComponent().appending(path: name + "_images", directoryHint: .isDirectory)
+    }
+
+    /// True for a file another app keeps only for a while: anything in the user's Library (where
+    /// screenshot tools such as CleanShot put their captures) or in a temporary folder. Such a
+    /// file is copied next to the document instead of being referenced where it is.
+    static func isTransient(_ file: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+        let path = file.standardizedFileURL.resolvingSymlinksInPath().path
+        let library = home.standardizedFileURL.resolvingSymlinksInPath().appending(path: "Library").path
+        let temporary = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders",
+                         FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path]
+        return ([library] + temporary).contains { path == $0 || path.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }
+    }
+
+    /// Where a copy of `file` goes in `folder`: the same name, with `-2`, `-3`, … added when taken.
+    static func copyURL(for file: URL, in folder: URL, exists: (URL) -> Bool) -> URL {
+        let base = file.deletingPathExtension().lastPathComponent
+        let ext = file.pathExtension
+        func named(_ name: String) -> URL { folder.appending(path: ext.isEmpty ? name : "\(name).\(ext)") }
+        var url = named(base)
+        var index = 2
+        while exists(url) {
+            url = named("\(base)-\(index)")
+            index += 1
+        }
+        return url
+    }
+
     /// Where a pasted image is saved: `image-YYYYMMDD-HHMMSS.png` in `folder`, with `-2`, `-3`, …
     /// added when that name is taken.
     static func pastedImageURL(in folder: URL, date: Date, exists: (URL) -> Bool) -> URL {
