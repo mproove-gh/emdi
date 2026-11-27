@@ -59,6 +59,16 @@ struct MarkdownStylerTests {
         #expect(ranges(.syntax, in: "- item").isEmpty)
     }
 
+    @Test func listItemsKnowTheirDepthAndKind() {
+        let text = "- a\n  - b\n    1. c\n- [ ] d\n\n   more d"
+        #expect(ranges(.listItem(depth: 0, bullet: true, list: 0), in: text) == [r(0, 2)])
+        #expect(ranges(.listItem(depth: 1, bullet: true, list: 6), in: text) == [r(6, 2)])
+        #expect(ranges(.listItem(depth: 2, bullet: false, list: 14), in: text) == [r(14, 3)])
+        // A task is not a bullet; its later paragraph is a continuation.
+        #expect(ranges(.listItem(depth: 0, bullet: false, list: 0), in: text) == [r(19, 6)])
+        #expect(ranges(.listContinuation(depth: 0, list: 0), in: text) == [r(31, 6)])
+    }
+
     @Test func syntaxBelongsToItsOwnBlock() {
         let text = "first\n\n**second**"
         let syntax = MarkdownStyler.spans(for: text).filter { $0.kind == .syntax }

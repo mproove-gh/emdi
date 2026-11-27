@@ -8,6 +8,8 @@ extension NSAttributedString.Key {
     static let codeLanguage = NSAttributedString.Key("emdi.codeLanguage")
     /// Set on the hidden `- [ ] ` prefix of a task item. The value is a Bool, true when checked.
     static let taskCheckbox = NSAttributedString.Key("emdi.taskCheckbox")
+    /// Set on the hidden `-`, `*` or `+` of a bullet list item. The value is the item's nesting depth (Int).
+    static let listBullet = NSAttributedString.Key("emdi.listBullet")
     /// Set on each table line. The value is a `TableRowRole` raw value.
     static let tableRow = NSAttributedString.Key("emdi.tableRow")
     /// Set on each hidden `|` of a table. The value is a CGFloat: how far after the pipe its border is drawn.
@@ -80,6 +82,19 @@ final class MarkdownLayoutDelegate: NSObject, NSTextLayoutManagerDelegate {
             let fragment = TaskLayoutFragment(textElement: textElement, range: range)
             fragment.prefixRange = task.range
             fragment.isChecked = task.checked
+            return fragment
+        }
+
+        var bullet: (index: Int, depth: Int)?
+        string.enumerateAttribute(.listBullet, in: whole) { value, marker, stop in
+            guard let depth = value as? Int else { return }
+            bullet = (marker.location, depth)
+            stop.pointee = true
+        }
+        if let bullet {
+            let fragment = ListItemLayoutFragment(textElement: textElement, range: range)
+            fragment.bulletIndex = bullet.index
+            fragment.depth = bullet.depth
             return fragment
         }
 

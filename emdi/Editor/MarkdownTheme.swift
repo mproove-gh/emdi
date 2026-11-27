@@ -133,9 +133,8 @@ enum MarkdownTheme {
                 ], range: range)
             case .marker:
                 storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range)
-                if (storage.string as NSString).substring(with: range).trimmingCharacters(in: .whitespaces) != ">" {
-                    tightenListItem(at: range, of: storage, fonts: fonts)
-                }
+            case .listItem, .listContinuation:
+                break  // Laid out by layOutListItems once every font is final.
             case .syntax:
                 if StyleSpan.isActive(block: span.blockRange, selection: selection) {
                     storage.addAttributes([
@@ -156,7 +155,6 @@ enum MarkdownTheme {
                                       range: range)
                 storage.addAttribute(.kern, value: TaskLayoutFragment.checkboxWidth,
                                      range: NSRange(location: NSMaxRange(range) - 1, length: 1))
-                tightenListItem(at: range, of: storage, fonts: fonts)
             case .completedTask:
                 storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range)
             case .tableRow(let role):
@@ -195,20 +193,79 @@ enum MarkdownTheme {
                 storage.addAttributes(attributes, range: range)
             }
         }
+        layOutListItems(spans, in: storage, fonts: fonts)
         layOutTables(spans, in: storage, selection: selection, availableWidth: context.availableWidth, fonts: fonts)
         storage.endEditing()
     }
 
     private static let codeBackground = EditorPalette.inlineCodeBackground
 
-    /// List items sit closer together than paragraphs, as in Typora: the gap after a list comes
-    /// from the blank line that ends it.
-    private static func tightenListItem(at marker: NSRange, of storage: NSTextStorage, fonts: EditorFonts) {
-        let paragraph = (storage.string as NSString).paragraphRange(for: marker)
-        let style = paragraphStyle(for: fonts).mutableCopy() as! NSMutableParagraphStyle
-        style.paragraphSpacing = (fonts.size * 0.12).rounded()
-        storage.addAttribute(.paragraphStyle, value: style, range: paragraph)
+    /// Lays out list items as in Typora. Each nesting level is indented by `listLevelIndent`, whatever
+    /// the indentation in the source, and wrapped lines hang under the item's text. A `-`, `*` or `+`
+    /// stays in the text but is drawn as a bullet that depends on the depth (`ListItemLayoutFragment`).
+    /// Items sit closer together than paragraphs: the gap after a list comes from its blank line.
+    private static func layOutListItems(_ spans: [StyleSpan], in storage: NSTextStorage, fonts: EditorFonts) {
+        let text = storage.string as NSString
+        func width(_ range: NSRange) -> CGFloat {
+            range.length > 0 ? storage.attributedSubstring(from: range).size().width : 0
+        }
+        func level(_ depth: Int) -> CGFloat {
+            (fonts.size * (listBaseIndent + CGFloat(depth) * listLevelIndent)).rounded()
+        }
+
+        // Markers are right-aligned in a column as wide as the list's widest marker, so the text of
+        // every item starts at the same place and numbers line up on their dot (9. and 10.).
+        var columns: [Int: CGFloat] = [:]
+        for span in spans {
+            guard case .listItem(let depth, let bullet, let list) = span.kind, span.range.length > 0 else { continue }
+            if bullet {
+                // Room between the bullet and the text, as kern on the hidden marker character.
+                let character = NSRange(location: span.range.location, length: 1)
+                storage.addAttributes([
+                    .foregroundColor: NSColor.clear,
+                    .listBullet: depth,
+                    .kern: max(0, (fonts.size * listBulletWidth).rounded() - width(character)),
+                ], range: character)
+            }
+            columns[list] = max(columns[list] ?? (fonts.size * listMarkerColumn).rounded(), width(span.range))
+        }
+
+        for span in spans {
+            switch span.kind {
+            case .listItem(let depth, _, let list) where span.range.length > 0:
+                let marker = span.range
+                let line = text.lineRange(for: NSRange(location: marker.location, length: 0))
+                let leadingWidth = width(NSRange(location: line.location, length: marker.location - line.location))
+                let markerWidth = width(marker)
+                let column = columns[list] ?? markerWidth
+                let indent = max(0, level(depth) + column - markerWidth - leadingWidth)
+                let style = paragraphStyle(for: fonts).mutableCopy() as! NSMutableParagraphStyle
+                style.paragraphSpacing = (fonts.size * 0.12).rounded()
+                style.firstLineHeadIndent = indent
+                style.headIndent = indent + leadingWidth + markerWidth
+                storage.addAttribute(.paragraphStyle, value: style, range: text.paragraphRange(for: marker))
+            case .listContinuation(let depth, let list):
+                // Under the item's text.
+                let textStart = level(depth) + (columns[list] ?? (fonts.size * listMarkerColumn).rounded())
+                text.enumerateSubstrings(in: span.range, options: [.byLines, .substringNotRequired]) { _, line, _, _ in
+                    let paragraph = text.paragraphRange(for: line)
+                    let leadingWidth = width(NSRange(location: paragraph.location, length: line.location - paragraph.location))
+                    let style = paragraphStyle(for: fonts).mutableCopy() as! NSMutableParagraphStyle
+                    style.firstLineHeadIndent = max(0, textStart - leadingWidth)
+                    style.headIndent = textStart
+                    storage.addAttribute(.paragraphStyle, value: style, range: paragraph)
+                }
+            default:
+                break
+            }
+        }
     }
+
+    /// List geometry, in multiples of the text size.
+    private static let listBaseIndent: CGFloat = 0.2
+    private static let listLevelIndent: CGFloat = 1.8
+    private static let listMarkerColumn: CGFloat = 1.6
+    private static let listBulletWidth: CGFloat = 1.2
 
     /// Gives each line of a heading its spacing, and marks the last line of an H1 or H2 for the thin
     /// rule `HeadingLayoutFragment` draws under it.
@@ -233,7 +290,7 @@ enum MarkdownTheme {
         switch kind {
         case .heading, .codeBlock, .blockQuote, .thematicBreak, .blankLine: 0
         case .inlineCode, .codeToken: 1
-        case .strong, .emphasis, .strikethrough, .link, .marker, .completedTask, .tableRow, .tableCell: 2
+        case .strong, .emphasis, .strikethrough, .link, .marker, .completedTask, .tableRow, .tableCell, .listItem, .listContinuation: 2
         case .syntax, .taskMarker, .tablePipe: 3
         case .blockImage: 4
         }

@@ -17,6 +17,12 @@ struct StyleSpan: Equatable, Sendable {
         case link
         /// List bullets/numbers and quote `>`: always visible, dimmed.
         case marker
+        /// The marker of a list item (`- `, `1. `, `- [ ] `), alongside its `.marker` or `.taskMarker` span.
+        /// `depth` is 0 for a top-level item; `bullet` is true for `-`, `*` and `+` items that aren't tasks.
+        /// `list` identifies the item's list (the offset where the list starts), so its markers can share a column.
+        case listItem(depth: Int, bullet: Bool, list: Int)
+        /// A later paragraph of a list item, laid out under the item's text.
+        case listContinuation(depth: Int, list: Int)
         /// Syntax delimiters (`**`, `#`, fences, `](url)`, …): hidden unless the caret is in their block.
         case syntax
         /// The `- [ ] ` / `- [x] ` prefix of a task item, always drawn as a checkbox.
@@ -169,6 +175,21 @@ private struct SpanWalker {
                     if checked { spans.append(StyleSpan(kind: .completedTask, range: first, blockRange: first)) }
                 } else {
                     spans.append(StyleSpan(kind: .marker, range: marker, blockRange: first))
+                }
+                var depth = 0
+                var ancestor = item.parent
+                while let current = ancestor {
+                    if current is ListItem { depth += 1 }
+                    ancestor = current.parent
+                }
+                let bullet = item.checkbox == nil && item.parent is UnorderedList
+                let list = item.parent?.range.map(map.nsRange(of:))?.location ?? range.location
+                spans.append(StyleSpan(kind: .listItem(depth: depth, bullet: bullet, list: list), range: marker, blockRange: first))
+                for child in item.children.dropFirst() where child is Paragraph {
+                    if let childRange = child.range.map(map.nsRange(of:)) {
+                        spans.append(StyleSpan(kind: .listContinuation(depth: depth, list: list), range: childRange,
+                                               blockRange: childRange))
+                    }
                 }
             }
         case is Strong:

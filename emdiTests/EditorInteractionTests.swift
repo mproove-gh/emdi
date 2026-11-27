@@ -104,4 +104,31 @@ struct EditorInteractionTests {
         #expect(host.textView.isOverControl(NSPoint(x: button.frame.midX, y: button.frame.midY)))
         #expect(!host.textView.isOverControl(inBlock))
     }
+
+    @Test func bulletsDependOnDepthAndNumbersLineUp() throws {
+        let host = try EditorTestHost(text: "- one\n  - two\n    - three\n      - four\n\n9. nine\n10. ten\n")
+        defer { host.close() }
+        var textStarts: [CGFloat] = []
+        for (depth, word) in ["one", "two", "three", "four"].enumerated() {
+            let location = try host.location(of: word)
+            let fragment = try #require(host.fragment(at: location) as? ListItemLayoutFragment, "\(word)")
+            #expect(fragment.depth == depth)
+            let line = try #require(fragment.textLineFragments.first)
+            let offset = location - (host.textView.string as NSString).lineRange(for: NSRange(location: location, length: 0)).location
+            textStarts.append(fragment.layoutFragmentFrame.minX + line.typographicBounds.minX + line.locationForCharacter(at: offset).x)
+        }
+        // Each level is indented by more than the two source spaces.
+        for (outer, inner) in zip(textStarts, textStarts.dropFirst()) { #expect(inner - outer > 20) }
+
+        // Numbers are right-aligned: the text of 9. and 10. starts at the same place.
+        func textStart(_ word: String) throws -> CGFloat {
+            let location = try host.location(of: word)
+            let fragment = try #require(host.fragment(at: location))
+            let line = try #require(fragment.textLineFragments.first)
+            let offset = location - (host.textView.string as NSString).lineRange(for: NSRange(location: location, length: 0)).location
+            return fragment.layoutFragmentFrame.minX + line.typographicBounds.minX + line.locationForCharacter(at: offset).x
+        }
+        let nine = try textStart("nine"), ten = try textStart("ten")
+        #expect(abs(nine - ten) < 0.5, "nine \(nine) ten \(ten)")
+    }
 }
