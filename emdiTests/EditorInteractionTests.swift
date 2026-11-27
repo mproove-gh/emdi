@@ -152,4 +152,28 @@ struct EditorInteractionTests {
         host.textView.deleteBackward(nil)
         #expect(host.textView.string == "> one\n>\n> two\n> - item\n")
     }
+
+    @Test func calloutsDrawATitleThatTheCaretReveals() throws {
+        let host = try EditorTestHost(text: "Intro.\n\n> [!TIP]\n> Body text.\n\n> [!NOTE] Own title\n> More.\n")
+        defer { host.close() }
+        host.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        host.pump()
+        let tipLine = try host.location(of: "[!TIP]")
+        let title = try #require(host.fragment(at: tipLine) as? MarkdownLayoutFragment)
+        #expect(title.callout == .tip)
+        #expect(title.calloutTitle?.string == "Tip")
+        let hiddenHeight = title.layoutFragmentFrame.height
+        let body = try #require(host.fragment(at: try host.location(of: "Body")) as? MarkdownLayoutFragment)
+        #expect(body.callout == .tip && body.calloutTitle == nil)
+        // A title after the marker replaces the kind's name: only the icon is drawn.
+        let own = try #require(host.fragment(at: try host.location(of: "[!NOTE]")) as? MarkdownLayoutFragment)
+        #expect(own.calloutTitle?.string == "")
+
+        // On the first line the marker shows as text, without a drawn title; the line keeps its height.
+        host.textView.setSelectedRange(NSRange(location: tipLine + 3, length: 0))
+        host.pump()
+        let shown = try #require(host.fragment(at: tipLine) as? MarkdownLayoutFragment)
+        #expect(shown.calloutTitle == nil)
+        #expect(abs(shown.layoutFragmentFrame.height - hiddenHeight) < 1)
+    }
 }

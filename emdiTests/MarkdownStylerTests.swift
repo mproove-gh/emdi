@@ -58,6 +58,14 @@ struct MarkdownStylerTests {
         #expect(ranges(.marker, in: "> quote").isEmpty)
     }
 
+    @Test func calloutsAreTopLevelQuotesOpeningWithAKind() {
+        let text = "> [!Warning] Careful\n> body\n\n> [!NOPE]\n> plain\n\n> > [!NOTE]\n> > nested"
+        #expect(ranges(.callout(.warning), in: text) == [r(0, 27)])
+        #expect(ranges(.calloutMarker(.warning), in: text) == [r(2, 11)])
+        // Unknown kinds and nested quotes are ordinary quotes.
+        #expect(MarkdownStyler.spans(for: text).filter { if case .callout = $0.kind { true } else { false } }.count == 1)
+    }
+
     @Test func quoteMarkersKnowTheirDepth() {
         let text = "> a\n>\n> > b\n>> c"
         #expect(ranges(.quoteMarker(depth: 1, blank: false), in: text) == [r(0, 2)])

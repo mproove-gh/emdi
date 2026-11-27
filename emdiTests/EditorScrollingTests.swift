@@ -37,8 +37,16 @@ struct EditorScrollingTests {
         let host = try EditorTestHost()
         defer { host.close() }
         let textView = host.textView
-        // Scroll to the middle of the document without laying out everything first, like a fresh open.
-        textView.scroll(NSPoint(x: 0, y: 4000))
+        // Scroll to the tables section, laying out only what is above it, as scrolling down would.
+        // Every block the caret visits is at or below the top of the view: a block above it may
+        // legitimately change height (a wide table shown as Markdown) and move what is in view.
+        let lm = try #require(textView.textLayoutManager)
+        let content = try #require(lm.textContentManager)
+        let heading = try #require(content.location(content.documentRange.location,
+                                                    offsetBy: try host.location(of: "## 6. Tables")))
+        lm.ensureLayout(for: try #require(NSTextRange(location: content.documentRange.location, end: heading)))
+        let tables = try #require(host.fragment(at: try host.location(of: "## 6. Tables")))
+        textView.scroll(NSPoint(x: 0, y: tables.layoutFragmentFrame.midY + textView.textContainerOrigin.y))
         host.pump()
         let before = host.topOfView()
         // Move the caret into blocks of different kinds, as clicks would.

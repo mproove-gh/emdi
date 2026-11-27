@@ -36,8 +36,8 @@ final class ListItemLayoutFragment: MarkdownLayoutFragment {
         super.draw(at: point, in: context)
         let rect = bulletRect.offsetBy(dx: point.x, dy: point.y)
         context.saveGState()
-        // In a quote the bullet takes the quote's quieter color, like its text.
-        let color = (quoteBars == nil ? EditorPalette.text : EditorPalette.secondaryText).cgColor
+        // In a quote the bullet takes the quote's quieter color, like its text (callouts keep normal text).
+        let color = (quoteBars != nil && callout == nil ? EditorPalette.secondaryText : EditorPalette.text).cgColor
         switch depth {
         case 0:
             context.setFillColor(color)

@@ -195,7 +195,7 @@ enum MarkdownFormatter {
         // Line prefixes on the selected lines: list bullets and numbers, task boxes, quote markers.
         for span in spans where NSIntersectionRange(span.range, lines).length > 0 {
             switch span.kind {
-            case .quoteMarker:
+            case .quoteMarker, .calloutMarker:
                 removals.append(span.range)  // Includes the space after the last `>`.
             case .marker, .taskMarker:
                 var range = span.range

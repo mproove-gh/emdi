@@ -20,6 +20,11 @@ struct StyleSpan: Equatable, Sendable {
         /// The `>` markers at the start of a quote line, with the space after the last one. Always hidden:
         /// the quote is drawn as `depth` bars. `blank` lines (nothing after the markers) are drawn short.
         case quoteMarker(depth: Int, blank: Bool)
+        /// A whole GitHub-style callout (a top-level quote that opens with `[!NOTE]`, `[!TIP]`, …).
+        case callout(CalloutKind)
+        /// The `[!KIND]` marker of a callout and the spaces after it: drawn as an icon and title,
+        /// shown as text while the caret is on its line.
+        case calloutMarker(CalloutKind)
         /// The marker of a list item (`- `, `1. `, `- [ ] `), alongside its `.marker` or `.taskMarker` span.
         /// `depth` is 0 for a top-level item; `bullet` is true for `-`, `*` and `+` items that aren't tasks.
         /// `list` identifies the item's list (the offset where the list starts), so its markers can share a column.
@@ -54,7 +59,7 @@ struct StyleSpan: Equatable, Sendable {
 
     var dependsOnCaret: Bool {
         switch kind {
-        case .syntax, .tableRow, .thematicBreak, .blankLine, .quoteMarker(_, blank: true): true
+        case .syntax, .tableRow, .thematicBreak, .blankLine, .quoteMarker(_, blank: true), .calloutMarker: true
         default: false
         }
     }
@@ -170,7 +175,16 @@ private struct SpanWalker {
             add(.thematicBreak, range)
         case is BlockQuote:
             add(.blockQuote, range)
-            if quoteNesting == 0 { addQuoteMarkers(in: range) }
+            if quoteNesting == 0 {
+                addQuoteMarkers(in: range)
+                let firstLine = nsText.lineRange(for: NSRange(location: range.location, length: 0))
+                if let callout = CalloutKind.opening(of: firstLine, in: nsText) {
+                    add(.callout(callout.kind), range)
+                    let line = NSRange(location: firstLine.location,
+                                       length: (nsText.substring(with: firstLine).trimmingCharacters(in: .newlines) as NSString).length)
+                    spans.append(StyleSpan(kind: .calloutMarker(callout.kind), range: callout.marker, blockRange: line))
+                }
+            }
         case let item as ListItem:
             if let first = childRanges(of: node).first {
                 let marker = NSRange(location: range.location, length: max(first.location - range.location, 0))

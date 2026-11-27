@@ -76,6 +76,13 @@ open build/Build/Products/Debug/emdi.app                           # run
 - Every emdi fragment inherits from `MarkdownLayoutFragment`, which draws one `EditorPalette.quoteBar` bar per level over the fragment's full height, so the bars of consecutive lines join up. The delegate sets `quoteBars` on whatever fragment it made. Bullets in a quote are drawn in the secondary color, like the quote text.
 - Backspace right after a quote prefix removes the innermost level (the last `>` and its space), through `quotePrefixRanges`, which the coordinator sets after each parse.
 
+## Callouts (implemented)
+
+- A top-level quote whose first line is `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]` (any case) is a GitHub-style callout: `CalloutKind.opening` (`emdi/Markdown/Callout.swift`) detects it, and the styler emits `.callout(kind)` over the quote and `.calloutMarker(kind)` over `[!KIND]` and its spaces. Unknown kinds and nested quotes stay ordinary quotes.
+- `MarkdownTheme` puts the text back in the normal color, sets `.callout` on every line, and hides the marker unless the caret is on its line (it is then shown dimmed). While hidden, the line gets `.calloutTitle`: the kind's name, bold and in the kind's color, or an empty string when text follows the marker, which then is the title (bold, colored) with kern before it for the icon. The title line keeps a full line's height in both states.
+- `MarkdownLayoutFragment` paints the tint (`EditorPalette.calloutBackground`) from the bar to the column's right edge, colors the outer bar with `EditorPalette.callout`, and draws the SF Symbol and title. `indentQuotes` gives callout lines a tail indent and the last line some room under the text.
+- Palette colors used as attribute values must be created once (static), never per call: dynamic `NSColor`s compare by identity, so a new instance on each restyle makes the paragraphs look changed and TextKit re-lays them out, which moves the view.
+
 ## Local images (implemented)
 
 - Only an image that is **alone in its paragraph** is shown as an image (`StyleSpan.Kind.blockImage`). An image inside a line of text keeps link styling, and so does an image whose file can't be loaded.
@@ -147,7 +154,7 @@ open build/Build/Products/Debug/emdi.app                           # run
 
 - `samples/showcase.md` (with `samples/images/`) uses every supported feature, for checking emdi by hand. The user ticks its task list while testing, so don't commit those edits unless asked.
 - `EditorTestHost` (in emdiTests) hosts a real editor offscreen, on the showcase file or any text, with helpers for real clicks (it queues the mouse-up first, since NSTextView's `mouseDown` tracks until release), fragment lookup and the top of the visible area. `EditorInteractionTests` uses it for table clicks, code labels and pointer shapes.
-- `EditorScrollingTests` loads that file in an offscreen window and checks that the top of the visible area doesn't move when the caret changes block, while typing, or when a checkbox far from the caret is clicked (toggling a box never scrolls to the caret). Tests must not depend on the file's checkbox states.
+- `EditorScrollingTests` loads that file in an offscreen window (lay out everything above the point you scroll to, as real scrolling does, otherwise the first restyle corrects TextKit's height estimates and the view moves) and checks that the top of the visible area doesn't move when the caret changes block, while typing, or when a checkbox far from the caret is clicked (toggling a box never scrolls to the caret). Tests must not depend on the file's checkbox states.
 - An `NSWindow` made in a test needs `isReleasedWhenClosed = false`, otherwise `close()` over-releases it and the test host crashes. xcodebuild then restarts and may still print a passing summary for a partial run.
 
 ## Verifying rendering visually

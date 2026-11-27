@@ -149,6 +149,37 @@ enum MarkdownTheme {
                         .backgroundColor: NSColor.clear,
                     ], range: range)
                 }
+            case .callout(let kind):
+                // Normal text color, not the quote's quieter one; the tint and bar come from the fragment.
+                storage.addAttribute(.foregroundColor, value: EditorPalette.text, range: range)
+                storage.addAttribute(.callout, value: kind.rawValue,
+                                     range: (storage.string as NSString).paragraphRange(for: range))
+            case .calloutMarker(let kind):
+                let text = storage.string as NSString
+                let paragraph = text.paragraphRange(for: range)
+                let style = paragraphStyle(for: fonts).mutableCopy() as! NSMutableParagraphStyle
+                style.minimumLineHeight = (fonts.body.ascender - fonts.body.descender + fonts.body.leading).rounded(.up)
+                style.paragraphSpacingBefore = (fonts.size * 0.5).rounded()
+                storage.addAttribute(.paragraphStyle, value: style, range: paragraph)
+                // A title written after the marker replaces the kind's name.
+                let titleEnd = span.blockRange.location + span.blockRange.length
+                let customTitle = NSRange(location: NSMaxRange(range), length: max(0, titleEnd - NSMaxRange(range)))
+                let titleFont = NSFontManager.shared.convert(fonts.body, toHaveTrait: .boldFontMask)
+                if customTitle.length > 0 {
+                    storage.addAttributes([.font: titleFont, .foregroundColor: EditorPalette.callout(kind)], range: customTitle)
+                }
+                if StyleSpan.isActive(block: span.blockRange, selection: selection) {
+                    storage.addAttribute(.foregroundColor, value: EditorPalette.syntax, range: range)
+                } else {
+                    let label = NSAttributedString(string: customTitle.length > 0 ? "" : kind.title, attributes: [
+                        .font: titleFont, .foregroundColor: EditorPalette.callout(kind),
+                    ])
+                    storage.addAttributes([.font: hiddenFont, .foregroundColor: NSColor.clear], range: range)
+                    storage.addAttribute(.calloutTitle, value: label, range: paragraph)
+                    // Room for the icon before a custom title.
+                    storage.addAttribute(.kern, value: (fonts.size * MarkdownLayoutFragment.calloutIconRoom).rounded(),
+                                         range: NSRange(location: NSMaxRange(range) - 1, length: 1))
+                }
             case .quoteMarker(let depth, let blank):
                 // Hidden; the quote is drawn as bars and indented by indentQuotes.
                 storage.addAttributes([.font: hiddenFont, .foregroundColor: NSColor.clear], range: range)
@@ -283,6 +314,14 @@ enum MarkdownTheme {
                 let style = current.mutableCopy() as! NSMutableParagraphStyle
                 style.firstLineHeadIndent += bars.indent
                 style.headIndent += bars.indent
+                if storage.attribute(.callout, at: paragraph.location, effectiveRange: nil) != nil {
+                    style.tailIndent = -bars.step / 2  // The tint runs to the edge; keep the text off it.
+                    // The tint covers the last line's paragraph spacing: keep some room under the text.
+                    let next = NSMaxRange(paragraph)
+                    if next >= storage.length || storage.attribute(.callout, at: next, effectiveRange: nil) == nil {
+                        style.paragraphSpacing = max(style.paragraphSpacing, (bars.step * 0.45).rounded())
+                    }
+                }
                 storage.addAttribute(.paragraphStyle, value: style, range: paragraph)
             }
         }
@@ -320,8 +359,8 @@ enum MarkdownTheme {
         switch kind {
         case .heading, .codeBlock, .blockQuote, .thematicBreak, .blankLine: 0
         case .inlineCode, .codeToken: 1
-        case .strong, .emphasis, .strikethrough, .link, .marker, .completedTask, .tableRow, .tableCell, .listItem, .listContinuation: 2
-        case .syntax, .taskMarker, .tablePipe, .quoteMarker: 3
+        case .strong, .emphasis, .strikethrough, .link, .marker, .completedTask, .tableRow, .tableCell, .listItem, .listContinuation, .callout: 2
+        case .syntax, .taskMarker, .tablePipe, .quoteMarker, .calloutMarker: 3
         case .blockImage: 4
         }
     }

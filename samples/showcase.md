@@ -149,6 +149,28 @@ A list with multi-paragraph items:
 >
 > ### Quoted heading
 
+### Callouts
+
+GitHub-style callouts: a quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`.
+
+> [!NOTE]
+> Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.
+
+> [!TIP]
+> Put the caret on the first line to see the `[!TIP]` marker.
+
+> [!IMPORTANT]
+> Ut enim ad minim veniam, quis nostrud exercitation:
+>
+> - ullamco laboris nisi
+> - ut aliquip ex ea commodo
+
+> [!WARNING] Mind the custom title
+> A title written after the marker replaces the kind's name.
+
+> [!CAUTION]
+> Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore.
+
 ---
 
 ## 5. Code blocks

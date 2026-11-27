@@ -22,6 +22,28 @@ enum EditorPalette {
     static let quoteBar = dynamic(light: 0xD3CEC4, dark: 0x45454A)
     static let checkbox = dynamic(light: 0x85837D, dark: 0x7D7C80)
     static let checkboxChecked = dynamic(light: 0x2F6FD6, dark: 0x5B9BF0)
+    /// Callouts: the bar, icon and title in the kind's color, over a faint tint of it. The colors are
+    /// made once: a dynamic color compares by identity, and a new instance on each restyle would make
+    /// every callout paragraph look changed (see `MarkdownTheme.apply`).
+    static func callout(_ kind: CalloutKind) -> NSColor { calloutColors[kind]! }
+    static func calloutBackground(_ kind: CalloutKind) -> NSColor { calloutBackgrounds[kind]! }
+
+    private static let calloutColors: [CalloutKind: NSColor] = [
+        .note: dynamic(light: 0x1C58B3, dark: 0x6AA8F7),
+        .tip: dynamic(light: 0x1D6B35, dark: 0x5CC27A),
+        .important: dynamic(light: 0x6E3AB8, dark: 0xB592F0),
+        .warning: dynamic(light: 0x7D5200, dark: 0xE0A93A),
+        .caution: dynamic(light: 0xAE2A20, dark: 0xF27467),
+    ]
+
+    private static let calloutBackgrounds: [CalloutKind: NSColor] = calloutColors.mapValues { accent in
+        NSColor(name: nil) { appearance in
+            let dark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            let base = resolve(background, dark: dark)
+            return base.blended(withFraction: dark ? 0.10 : 0.08, of: resolve(accent, dark: dark)) ?? base
+        }
+    }
+
     static let cursor = dynamic(light: 0xE8621A, dark: 0xF2782F)
 
     // Code, after Xcode's default themes, tuned for the backgrounds above.

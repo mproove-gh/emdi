@@ -12,6 +12,11 @@ extension NSAttributedString.Key {
     static let listBullet = NSAttributedString.Key("emdi.listBullet")
     /// Set on each line of a block quote. The value is a `QuoteBars`.
     static let quoteBars = NSAttributedString.Key("emdi.quoteBars")
+    /// Set on each line of a callout. The value is a `CalloutKind` raw value.
+    static let callout = NSAttributedString.Key("emdi.callout")
+    /// Set on the first line of a callout while its `[!KIND]` marker is hidden. The value is the styled
+    /// name drawn after the icon (empty when the line has its own title).
+    static let calloutTitle = NSAttributedString.Key("emdi.calloutTitle")
     /// Set on each table line. The value is a `TableRowRole` raw value.
     static let tableRow = NSAttributedString.Key("emdi.tableRow")
     /// Set on each hidden `|` of a table. The value is a CGFloat: how far after the pipe its border is drawn.
@@ -35,7 +40,10 @@ final class MarkdownLayoutDelegate: NSObject, NSTextLayoutManagerDelegate {
         let fragment = makeFragment(for: textElement)
         if let fragment = fragment as? MarkdownLayoutFragment, let paragraph = textElement as? NSTextParagraph,
            paragraph.attributedString.length > 0 {
-            fragment.quoteBars = paragraph.attributedString.attribute(.quoteBars, at: 0, effectiveRange: nil) as? QuoteBars
+            let string = paragraph.attributedString
+            fragment.quoteBars = string.attribute(.quoteBars, at: 0, effectiveRange: nil) as? QuoteBars
+            fragment.callout = (string.attribute(.callout, at: 0, effectiveRange: nil) as? String).flatMap(CalloutKind.init)
+            fragment.calloutTitle = string.attribute(.calloutTitle, at: 0, effectiveRange: nil) as? NSAttributedString
         }
         return fragment
     }
