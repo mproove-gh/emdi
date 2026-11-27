@@ -9,7 +9,7 @@ struct CodeBlockEdges: OptionSet {
 
 /// Lays out one line of a code block and paints its background across the whole text container width.
 /// Consecutive lines touch, so together they draw one rounded panel.
-final class CodeBlockLayoutFragment: NSTextLayoutFragment {
+final class CodeBlockLayoutFragment: MarkdownLayoutFragment {
     static let verticalPadding: CGFloat = 6
     private static let cornerRadius: CGFloat = 6
 

@@ -18,6 +18,8 @@ enum EditorPalette {
     static let codeBlockBackground = dynamic(light: 0xE7E3DA, dark: 0x262629)
     static let tableHeaderBackground = dynamic(light: 0xE7E3DA, dark: 0x28282B)
     static let border = dynamic(light: 0xD0CCC2, dark: 0x3C3C40)
+    /// The bars down the side of block quotes.
+    static let quoteBar = dynamic(light: 0xD3CEC4, dark: 0x45454A)
     static let checkbox = dynamic(light: 0x85837D, dark: 0x7D7C80)
     static let checkboxChecked = dynamic(light: 0x2F6FD6, dark: 0x5B9BF0)
     static let cursor = dynamic(light: 0xE8621A, dark: 0xF2782F)

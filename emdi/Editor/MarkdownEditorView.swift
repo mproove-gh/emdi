@@ -143,6 +143,9 @@ struct MarkdownEditorView: NSViewRepresentable {
             textView.taskPrefixRanges = spans.compactMap { span in
                 if case .taskMarker = span.kind { span.range } else { nil }
             }
+            textView.quotePrefixRanges = spans.compactMap { span in
+                if case .quoteMarker = span.kind { span.range } else { nil }
+            }
             restyle(force: true)
         }
 

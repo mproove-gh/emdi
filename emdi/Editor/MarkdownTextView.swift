@@ -122,6 +122,8 @@ final class MarkdownTextView: NSTextView {
 
     /// Hidden `- [ ] ` prefixes of the task items, set by the coordinator after each parse.
     var taskPrefixRanges: [NSRange] = []
+    /// Hidden `> ` prefixes of the quote lines, set by the coordinator after each parse.
+    var quotePrefixRanges: [NSRange] = []
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
@@ -187,6 +189,17 @@ final class MarkdownTextView: NSTextView {
             apply(TextEdit(range: prefix, replacement: "", selection: NSRange(location: prefix.location, length: 0)),
                   actionName: "Delete Checkbox")
             return
+        }
+        // Right after a hidden quote prefix, Backspace removes one quote level (the last `>` and its space).
+        if selection.length == 0, let prefix = quotePrefixRanges.first(where: { NSMaxRange($0) == selection.location }) {
+            let text = string as NSString
+            let last = text.range(of: ">", options: .backwards, range: prefix)
+            if last.location != NSNotFound {
+                let removed = NSRange(location: last.location, length: NSMaxRange(prefix) - last.location)
+                apply(TextEdit(range: removed, replacement: "", selection: NSRange(location: last.location, length: 0)),
+                      actionName: "Remove Quote Level")
+                return
+            }
         }
         super.deleteBackward(sender)
     }

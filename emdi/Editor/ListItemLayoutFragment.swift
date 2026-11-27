@@ -2,7 +2,7 @@ import AppKit
 
 /// Lays out a bullet list item and draws its bullet where the hidden `-`, `*` or `+` is:
 /// a disc at the top level, a circle one level down, a square below that, as in Typora.
-final class ListItemLayoutFragment: NSTextLayoutFragment {
+final class ListItemLayoutFragment: MarkdownLayoutFragment {
     /// The hidden marker character, relative to the paragraph.
     var bulletIndex = 0
     var depth = 0
@@ -36,7 +36,8 @@ final class ListItemLayoutFragment: NSTextLayoutFragment {
         super.draw(at: point, in: context)
         let rect = bulletRect.offsetBy(dx: point.x, dy: point.y)
         context.saveGState()
-        let color = EditorPalette.text.cgColor
+        // In a quote the bullet takes the quote's quieter color, like its text.
+        let color = (quoteBars == nil ? EditorPalette.text : EditorPalette.secondaryText).cgColor
         switch depth {
         case 0:
             context.setFillColor(color)

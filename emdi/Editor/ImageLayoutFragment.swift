@@ -21,7 +21,7 @@ final class BlockImage: NSObject {
 
 /// Lays out a paragraph that holds only an image and draws the image in the space
 /// its paragraph style reserves above the (hidden or dimmed) `![alt](path)` line.
-final class ImageLayoutFragment: NSTextLayoutFragment {
+final class ImageLayoutFragment: MarkdownLayoutFragment {
     /// Space between the image and the source line under it.
     static let gap: CGFloat = 4
 

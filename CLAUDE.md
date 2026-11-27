@@ -69,6 +69,13 @@ open build/Build/Products/Debug/emdi.app                           # run
 - Tables fill the text column: `alignColumns(fillWidth:)` grows each column in proportion to its width until the table is as wide as `availableWidth`. The spaces around each cell's text are hidden and only the text is measured (`contentRange(of:)`), so right and centered alignment are exact whatever the source padding; the padding is `tableCellPadding` of kern. A clipped table isn't stretched.
 - Wide tables (`MarkdownTheme.layOutTables`): a table wider than the text column is shrunk, with all its fonts scaled down to at least `minimumTableScale` (0.75). If it still doesn't fit, its rows get `lineBreakMode = .byClipping`, and `TableRowLayoutFragment` clips its drawing to the column. While the caret is in such a table, it is shown as plain Markdown instead (`showTableAsMarkdown`: grid attributes removed, pipes and delimiter row visible and dimmed) so long rows wrap and every cell stays editable. `.tableRow` spans count in `activeSyntaxBlocks`, so entering or leaving a table triggers a restyle. The width comes from `ThemeContext.availableWidth`, and the coordinator restyles on resize when the document has tables or images.
 
+## Block quotes (implemented)
+
+- The `>` markers of each quote line (with the space after the last one) are a `.quoteMarker(depth:blank:)` span, added by the outermost `BlockQuote` only. They are always hidden, whatever the caret position, like Typora.
+- `MarkdownTheme` sets `.quoteBars` (a `QuoteBars`: depth and step, value-equal) on the line, and `indentQuotes` runs last: it shifts each quote line's existing paragraph style right by `depth × step` (1.2 × size), so lists and headings inside quotes keep their own layout. A blank `>` line is drawn short like a blank line, except under the caret.
+- Every emdi fragment inherits from `MarkdownLayoutFragment`, which draws one `EditorPalette.quoteBar` bar per level over the fragment's full height, so the bars of consecutive lines join up. The delegate sets `quoteBars` on whatever fragment it made. Bullets in a quote are drawn in the secondary color, like the quote text.
+- Backspace right after a quote prefix removes the innermost level (the last `>` and its space), through `quotePrefixRanges`, which the coordinator sets after each parse.
+
 ## Local images (implemented)
 
 - Only an image that is **alone in its paragraph** is shown as an image (`StyleSpan.Kind.blockImage`). An image inside a line of text keeps link styling, and so does an image whose file can't be loaded.

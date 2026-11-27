@@ -1,7 +1,7 @@
 import AppKit
 
 /// Draws a `---` line (whose characters are hidden) as a thin rule across the text column.
-final class HorizontalRuleLayoutFragment: NSTextLayoutFragment {
+final class HorizontalRuleLayoutFragment: MarkdownLayoutFragment {
     private var ruleRect: CGRect {
         let frame = layoutFragmentFrame
         let width = textLayoutManager?.textContainer?.size.width ?? frame.width

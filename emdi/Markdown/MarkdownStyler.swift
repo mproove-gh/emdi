@@ -15,8 +15,11 @@ struct StyleSpan: Equatable, Sendable {
         case emphasis
         case strikethrough
         case link
-        /// List bullets/numbers and quote `>`: always visible, dimmed.
+        /// List bullets and numbers: always visible, dimmed.
         case marker
+        /// The `>` markers at the start of a quote line, with the space after the last one. Always hidden:
+        /// the quote is drawn as `depth` bars. `blank` lines (nothing after the markers) are drawn short.
+        case quoteMarker(depth: Int, blank: Bool)
         /// The marker of a list item (`- `, `1. `, `- [ ] `), alongside its `.marker` or `.taskMarker` span.
         /// `depth` is 0 for a top-level item; `bullet` is true for `-`, `*` and `+` items that aren't tasks.
         /// `list` identifies the item's list (the offset where the list starts), so its markers can share a column.
@@ -51,7 +54,7 @@ struct StyleSpan: Equatable, Sendable {
 
     var dependsOnCaret: Bool {
         switch kind {
-        case .syntax, .tableRow, .thematicBreak, .blankLine: true
+        case .syntax, .tableRow, .thematicBreak, .blankLine, .quoteMarker(_, blank: true): true
         default: false
         }
     }
@@ -116,6 +119,8 @@ private struct SpanWalker {
     let nsText: NSString
     var spans: [StyleSpan] = []
     var block = NSRange(location: 0, length: 0)
+    /// How many block quotes enclose the node being visited. Markers are added by the outermost one only.
+    var quoteNesting = 0
 
     init(text: String) {
         map = SourceMap(text)
@@ -165,7 +170,7 @@ private struct SpanWalker {
             add(.thematicBreak, range)
         case is BlockQuote:
             add(.blockQuote, range)
-            addQuoteMarkers(in: range)
+            if quoteNesting == 0 { addQuoteMarkers(in: range) }
         case let item as ListItem:
             if let first = childRanges(of: node).first {
                 let marker = NSRange(location: range.location, length: max(first.location - range.location, 0))
@@ -211,7 +216,10 @@ private struct SpanWalker {
             break
         }
 
+        let isQuote = node is BlockQuote
+        if isQuote { quoteNesting += 1 }
         visitChildren(of: node)
+        if isQuote { quoteNesting -= 1 }
         block = enclosingBlock
     }
 
@@ -332,18 +340,28 @@ private struct SpanWalker {
             let line = nsText.lineRange(for: NSRange(location: lineStart, length: 0))
             var position = line.location
             var markerEnd = position
+            var depth = 0
             while position < NSMaxRange(line) {
                 let character = nsText.character(at: position)
                 if character == quote {
                     markerEnd = position + 1
+                    depth += 1
                 } else if character != space {
                     break
                 }
                 position += 1
             }
-            if markerEnd > line.location {
+            if depth > 0 {
+                let content = nsText.substring(with: line).trimmingCharacters(in: .newlines) as NSString
+                let end = line.location + content.length
+                if markerEnd < end, [space, unichar(UInt8(ascii: "\t"))].contains(nsText.character(at: markerEnd)) {
+                    markerEnd += 1
+                }
                 let marker = NSRange(location: line.location, length: markerEnd - line.location)
-                spans.append(StyleSpan(kind: .marker, range: marker, blockRange: line))
+                let rest = nsText.substring(with: NSRange(location: markerEnd, length: end - markerEnd))
+                let blank = rest.allSatisfy { $0 == " " || $0 == "\t" }
+                spans.append(StyleSpan(kind: .quoteMarker(depth: depth, blank: blank), range: marker,
+                                       blockRange: NSRange(location: line.location, length: end - line.location)))
             }
             lineStart = NSMaxRange(line)
         }

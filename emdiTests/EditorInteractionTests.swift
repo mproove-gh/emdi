@@ -131,4 +131,25 @@ struct EditorInteractionTests {
         let nine = try textStart("nine"), ten = try textStart("ten")
         #expect(abs(nine - ten) < 0.5, "nine \(nine) ten \(ten)")
     }
+
+    @Test func quotesAreDrawnAsBarsAndBackspaceRemovesALevel() throws {
+        let host = try EditorTestHost(text: "> one\n>\n> > two\n> - item\n")
+        defer { host.close() }
+        host.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        host.pump()
+        let one = try #require(host.fragment(at: try host.location(of: "one")) as? MarkdownLayoutFragment)
+        #expect(one.quoteBars?.depth == 1)
+        let two = try #require(host.fragment(at: try host.location(of: "two")) as? MarkdownLayoutFragment)
+        #expect(two.quoteBars?.depth == 2)
+        // A quoted list item keeps its bullet and gets the bar too.
+        let item = try #require(host.fragment(at: try host.location(of: "item")) as? ListItemLayoutFragment)
+        #expect(item.quoteBars?.depth == 1)
+        // The blank `>` line between paragraphs is drawn short.
+        #expect(try #require(host.fragment(at: 6)).layoutFragmentFrame.height < one.layoutFragmentFrame.height)
+
+        // Backspace at the start of the quoted text removes the innermost level.
+        host.textView.setSelectedRange(NSRange(location: try host.location(of: "two"), length: 0))
+        host.textView.deleteBackward(nil)
+        #expect(host.textView.string == "> one\n>\n> two\n> - item\n")
+    }
 }

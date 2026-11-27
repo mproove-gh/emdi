@@ -55,7 +55,14 @@ struct MarkdownStylerTests {
 
     @Test func listAndQuoteMarkersStayVisible() {
         #expect(ranges(.marker, in: "- item") == [r(0, 2)])
-        #expect(ranges(.marker, in: "> quote") == [r(0, 1)])
+        #expect(ranges(.marker, in: "> quote").isEmpty)
+    }
+
+    @Test func quoteMarkersKnowTheirDepth() {
+        let text = "> a\n>\n> > b\n>> c"
+        #expect(ranges(.quoteMarker(depth: 1, blank: false), in: text) == [r(0, 2)])
+        #expect(ranges(.quoteMarker(depth: 1, blank: true), in: text) == [r(4, 1)])
+        #expect(ranges(.quoteMarker(depth: 2, blank: false), in: text) == [r(6, 4), r(12, 3)])
         #expect(ranges(.syntax, in: "- item").isEmpty)
     }
 

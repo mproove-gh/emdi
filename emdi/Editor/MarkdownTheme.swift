@@ -149,6 +149,15 @@ enum MarkdownTheme {
                         .backgroundColor: NSColor.clear,
                     ], range: range)
                 }
+            case .quoteMarker(let depth, let blank):
+                // Hidden; the quote is drawn as bars and indented by indentQuotes.
+                storage.addAttributes([.font: hiddenFont, .foregroundColor: NSColor.clear], range: range)
+                let paragraph = (storage.string as NSString).paragraphRange(for: range)
+                storage.addAttribute(.quoteBars, value: QuoteBars(depth: depth, step: (fonts.size * quoteStep).rounded()),
+                                     range: paragraph)
+                if blank, !StyleSpan.isActive(block: span.blockRange, selection: selection) {
+                    storage.addAttribute(.paragraphStyle, value: blankLineStyle(for: fonts), range: paragraph)
+                }
             case .taskMarker(let checked):
                 // The prefix is hidden; the kern on its last character leaves room for the drawn checkbox.
                 storage.addAttributes([.font: hiddenFont, .foregroundColor: NSColor.clear, .taskCheckbox: checked],
@@ -194,6 +203,7 @@ enum MarkdownTheme {
             }
         }
         layOutListItems(spans, in: storage, fonts: fonts)
+        indentQuotes(in: storage)
         layOutTables(spans, in: storage, selection: selection, availableWidth: context.availableWidth, fonts: fonts)
         storage.endEditing()
     }
@@ -261,6 +271,26 @@ enum MarkdownTheme {
         }
     }
 
+    /// Shifts every quote line right by its bars, on top of the indentation it already has (lists).
+    private static func indentQuotes(in storage: NSTextStorage) {
+        let text = storage.string as NSString
+        storage.enumerateAttribute(.quoteBars, in: NSRange(location: 0, length: storage.length)) { value, run, _ in
+            guard let bars = value as? QuoteBars else { return }
+            text.enumerateSubstrings(in: run, options: [.byParagraphs, .substringNotRequired]) { _, _, paragraph, _ in
+                guard paragraph.length > 0,
+                      let current = storage.attribute(.paragraphStyle, at: paragraph.location, effectiveRange: nil) as? NSParagraphStyle
+                else { return }
+                let style = current.mutableCopy() as! NSMutableParagraphStyle
+                style.firstLineHeadIndent += bars.indent
+                style.headIndent += bars.indent
+                storage.addAttribute(.paragraphStyle, value: style, range: paragraph)
+            }
+        }
+    }
+
+    /// Width of one quote level (bar and gap), in multiples of the text size.
+    private static let quoteStep: CGFloat = 1.2
+
     /// List geometry, in multiples of the text size.
     private static let listBaseIndent: CGFloat = 0.2
     private static let listLevelIndent: CGFloat = 1.8
@@ -291,7 +321,7 @@ enum MarkdownTheme {
         case .heading, .codeBlock, .blockQuote, .thematicBreak, .blankLine: 0
         case .inlineCode, .codeToken: 1
         case .strong, .emphasis, .strikethrough, .link, .marker, .completedTask, .tableRow, .tableCell, .listItem, .listContinuation: 2
-        case .syntax, .taskMarker, .tablePipe: 3
+        case .syntax, .taskMarker, .tablePipe, .quoteMarker: 3
         case .blockImage: 4
         }
     }

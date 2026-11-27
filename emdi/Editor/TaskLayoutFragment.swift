@@ -1,7 +1,7 @@
 import AppKit
 
 /// Lays out a task item and draws a checkbox where its hidden `- [ ] ` prefix is.
-final class TaskLayoutFragment: NSTextLayoutFragment {
+final class TaskLayoutFragment: MarkdownLayoutFragment {
     /// Horizontal room reserved for the checkbox (kern on the prefix's last character).
     static let checkboxWidth: CGFloat = 24
     private static let checkboxSize: CGFloat = 15

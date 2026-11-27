@@ -1,7 +1,7 @@
 import AppKit
 
 /// Lays out the last line of an H1 or H2 and draws a thin rule under it, across the text column.
-final class HeadingLayoutFragment: NSTextLayoutFragment {
+final class HeadingLayoutFragment: MarkdownLayoutFragment {
     /// How far below the text the rule is drawn.
     var ruleGap: CGFloat = 4
 

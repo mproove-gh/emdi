@@ -2,7 +2,7 @@ import AppKit
 
 /// Lays out one table line and draws its cell borders at the (hidden) pipes, which
 /// `MarkdownTheme` has already spaced so that the columns line up from row to row.
-final class TableRowLayoutFragment: NSTextLayoutFragment {
+final class TableRowLayoutFragment: MarkdownLayoutFragment {
     static let verticalPadding: CGFloat = 5
 
     var role: TableRowRole = []
