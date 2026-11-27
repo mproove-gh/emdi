@@ -69,7 +69,14 @@ struct MarkdownStylerTests {
         let spans = MarkdownStyler.spans(for: "**a**\n\n**b**")
         #expect(spans.activeSyntaxBlocks(for: r(1, 0)) == [r(0, 5)])
         #expect(spans.activeSyntaxBlocks(for: r(12, 0)) == [r(7, 5)])
-        #expect(spans.activeSyntaxBlocks(for: r(6, 0)).isEmpty)
+        // The blank line between them is its own block: it is drawn full height only under the caret.
+        #expect(spans.activeSyntaxBlocks(for: r(6, 0)) == [r(6, 0)])
+    }
+
+    @Test func blankLinesOutsideCodeBlocksAreMarked() {
+        let text = "a\n\n  \n```\nx\n\ny\n```\n\nb"
+        // Lines 2 and 3 (empty, then spaces) and the one after the fence; not the one inside the code.
+        #expect(ranges(.blankLine, in: text) == [r(2, 1), r(3, 3), r(19, 1)])
     }
 
     @Test func taskItemsBecomeCheckboxes() {

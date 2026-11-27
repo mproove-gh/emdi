@@ -33,6 +33,9 @@ struct StyleSpan: Equatable, Sendable {
         case codeToken(CodeTokenKind)
         /// A paragraph that holds only an image (`![alt](path)`), shown as the image itself.
         case blockImage(source: String)
+        /// An empty (or whitespace-only) line between blocks, newline included. Drawn short, except
+        /// while the caret is on it. The block range is the line without its newline.
+        case blankLine
     }
 
     var kind: Kind
@@ -42,7 +45,7 @@ struct StyleSpan: Equatable, Sendable {
 
     var dependsOnCaret: Bool {
         switch kind {
-        case .syntax, .tableRow, .thematicBreak: true
+        case .syntax, .tableRow, .thematicBreak, .blankLine: true
         default: false
         }
     }
@@ -86,7 +89,19 @@ enum MarkdownStyler {
     static func spans(for text: String) -> [StyleSpan] {
         var walker = SpanWalker(text: text)
         walker.visit(Document(parsing: text))
-        return walker.spans
+        return walker.spans + blankLines(in: text as NSString, codeBlocks: walker.spans.filter { $0.kind == .codeBlock })
+    }
+
+    /// Whitespace-only lines outside code blocks, where blank lines are content.
+    private static func blankLines(in text: NSString, codeBlocks: [StyleSpan]) -> [StyleSpan] {
+        var spans: [StyleSpan] = []
+        text.enumerateSubstrings(in: NSRange(location: 0, length: text.length), options: .byLines) { line, lineRange, enclosing, _ in
+            guard let line, line.allSatisfy({ $0 == " " || $0 == "\t" }), enclosing.length > lineRange.length,
+                  !codeBlocks.contains(where: { NSIntersectionRange($0.range, lineRange).length > 0
+                      || NSLocationInRange(lineRange.location, $0.range) }) else { return }
+            spans.append(StyleSpan(kind: .blankLine, range: enclosing, blockRange: lineRange))
+        }
+        return spans
     }
 }
 
@@ -130,6 +145,11 @@ private struct SpanWalker {
                 }
             })
         case let codeBlock as CodeBlock:
+            // An indented block's range starts after the first line's indentation: include it, so the
+            // first line is indented like the others.
+            let lineStart = nsText.lineRange(for: NSRange(location: range.location, length: 0)).location
+            let range = isFence(nsText.lineRange(for: NSRange(location: range.location, length: 0)))
+                ? range : NSRange(location: lineStart, length: NSMaxRange(range) - lineStart)
             block = range
             add(.codeBlock, range)
             let content = addFences(in: range)

@@ -12,6 +12,9 @@ extension NSAttributedString.Key {
     static let tableRow = NSAttributedString.Key("emdi.tableRow")
     /// Set on each hidden `|` of a table. The value is a CGFloat: how far after the pipe its border is drawn.
     static let tablePipe = NSAttributedString.Key("emdi.tablePipe")
+    /// Set on the last line of an H1 or H2, drawn with a rule under it by `HeadingLayoutFragment`.
+    /// The value is a CGFloat: the gap between the text and the rule.
+    static let headingRule = NSAttributedString.Key("emdi.headingRule")
     /// Set on a hidden `---` line, drawn as a rule by `HorizontalRuleLayoutFragment`.
     static let horizontalRule = NSAttributedString.Key("emdi.horizontalRule")
     /// Set on a paragraph that holds only an image. The value is a `BlockImage`.
@@ -36,6 +39,12 @@ final class MarkdownLayoutDelegate: NSObject, NSTextLayoutManagerDelegate {
             let fragment = CodeBlockLayoutFragment(textElement: textElement, range: range)
             fragment.edges = CodeBlockEdges(rawValue: edges)
             fragment.languageLabel = string.attribute(.codeLanguage, at: 0, effectiveRange: nil) as? NSAttributedString
+            return fragment
+        }
+
+        if let gap = string.attribute(.headingRule, at: 0, effectiveRange: nil) as? CGFloat {
+            let fragment = HeadingLayoutFragment(textElement: textElement, range: range)
+            fragment.ruleGap = gap
             return fragment
         }
 

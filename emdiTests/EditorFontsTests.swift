@@ -21,7 +21,7 @@ struct EditorFontsTests {
 
     @Test func headingsScaleWithTheTextSizeAndAreBold() {
         let fonts = EditorFonts(FontSettings(textFamily: "Georgia", textSize: 30, codeFamily: ""))
-        #expect(fonts.heading(level: 1).pointSize == 56)
+        #expect(fonts.heading(level: 1).pointSize == 64)
         #expect(fonts.heading(level: 1).familyName == "Georgia")
         #expect(NSFontManager.shared.traits(of: fonts.heading(level: 1)).contains(.boldFontMask))
     }

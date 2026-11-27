@@ -16,11 +16,31 @@ enum MarkdownTheme {
     static let hiddenFont = NSFont.systemFont(ofSize: 0.01)
 
     /// Body text spacing, relative to the text size: about 1.6 line height (as in Typora and most
-    /// reading apps) and a clear gap between paragraphs.
+    /// reading apps). The gap between paragraphs is this spacing plus the short blank line between them.
     static func paragraphStyle(for fonts: EditorFonts) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
         style.lineSpacing = (fonts.size * 0.38).rounded()
-        style.paragraphSpacing = (fonts.size * 0.7).rounded()
+        style.paragraphSpacing = (fonts.size * 0.4).rounded()
+        return style
+    }
+
+    /// A blank line between blocks is a separator, not a line of text: it is drawn short. The one
+    /// holding the caret keeps a full line so typing there looks normal.
+    private static func blankLineStyle(for fonts: EditorFonts) -> NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        let height = (fonts.size * 0.35).rounded()
+        style.minimumLineHeight = height
+        style.maximumLineHeight = height
+        return style
+    }
+
+    /// Headings: space above them, little between their lines, and room below H1 and H2 for their rule.
+    /// `first` / `last` say whether the line opens or closes the heading (a setext heading has two lines).
+    private static func headingStyle(level: Int, fonts: EditorFonts, first: Bool, last: Bool) -> NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = (fonts.size * 0.15).rounded()
+        if first { style.paragraphSpacingBefore = (fonts.size * (level <= 2 ? 0.8 : 0.6)).rounded() }
+        if last { style.paragraphSpacing = (fonts.size * (level <= 2 ? 0.8 : 0.35)).rounded() }
         return style
     }
 
@@ -72,7 +92,13 @@ enum MarkdownTheme {
             switch span.kind {
             case .heading(let level):
                 storage.addAttribute(.font, value: fonts.heading(level: level), range: range)
+                if level == 6 { storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range) }
                 emboldenIfNeeded(range, of: storage)
+                styleHeadingLines(in: range, level: level, of: storage, fonts: fonts)
+            case .blankLine:
+                if !StyleSpan.isActive(block: span.blockRange, selection: selection) {
+                    storage.addAttribute(.paragraphStyle, value: blankLineStyle(for: fonts), range: range)
+                }
             case .codeBlock:
                 storage.addAttribute(.font, value: fonts.code, range: range)
                 markCodeBlockLines(in: range, of: storage, fonts: fonts,
@@ -84,7 +110,7 @@ enum MarkdownTheme {
                 // caret is on them. The line keeps a normal text height either way.
                 let style = NSMutableParagraphStyle()
                 style.minimumLineHeight = (fonts.size * 1.4).rounded()
-                style.paragraphSpacing = (fonts.size * 0.7).rounded()
+                style.paragraphSpacing = (fonts.size * 0.2).rounded()
                 storage.addAttribute(.paragraphStyle, value: style, range: range)
                 if StyleSpan.isActive(block: span.blockRange, selection: selection) {
                     storage.addAttribute(.foregroundColor, value: EditorPalette.syntax, range: range)
@@ -107,6 +133,9 @@ enum MarkdownTheme {
                 ], range: range)
             case .marker:
                 storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range)
+                if (storage.string as NSString).substring(with: range).trimmingCharacters(in: .whitespaces) != ">" {
+                    tightenListItem(at: range, of: storage, fonts: fonts)
+                }
             case .syntax:
                 if StyleSpan.isActive(block: span.blockRange, selection: selection) {
                     storage.addAttributes([
@@ -127,6 +156,7 @@ enum MarkdownTheme {
                                       range: range)
                 storage.addAttribute(.kern, value: TaskLayoutFragment.checkboxWidth,
                                      range: NSRange(location: NSMaxRange(range) - 1, length: 1))
+                tightenListItem(at: range, of: storage, fonts: fonts)
             case .completedTask:
                 storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range)
             case .tableRow(let role):
@@ -171,9 +201,37 @@ enum MarkdownTheme {
 
     private static let codeBackground = EditorPalette.inlineCodeBackground
 
+    /// List items sit closer together than paragraphs, as in Typora: the gap after a list comes
+    /// from the blank line that ends it.
+    private static func tightenListItem(at marker: NSRange, of storage: NSTextStorage, fonts: EditorFonts) {
+        let paragraph = (storage.string as NSString).paragraphRange(for: marker)
+        let style = paragraphStyle(for: fonts).mutableCopy() as! NSMutableParagraphStyle
+        style.paragraphSpacing = (fonts.size * 0.12).rounded()
+        storage.addAttribute(.paragraphStyle, value: style, range: paragraph)
+    }
+
+    /// Gives each line of a heading its spacing, and marks the last line of an H1 or H2 for the thin
+    /// rule `HeadingLayoutFragment` draws under it.
+    private static func styleHeadingLines(in range: NSRange, level: Int, of storage: NSTextStorage, fonts: EditorFonts) {
+        let text = storage.string as NSString
+        var lines: [NSRange] = []
+        text.enumerateSubstrings(in: range, options: [.byLines, .substringNotRequired]) { _, line, _, _ in
+            lines.append(line)
+        }
+        for (index, line) in lines.enumerated() {
+            let paragraph = text.paragraphRange(for: line)
+            let isLast = index == lines.count - 1
+            storage.addAttribute(.paragraphStyle, value: headingStyle(level: level, fonts: fonts, first: index == 0, last: isLast),
+                                 range: paragraph)
+            if isLast, level <= 2 {
+                storage.addAttribute(.headingRule, value: (fonts.size * 0.3).rounded(), range: paragraph)
+            }
+        }
+    }
+
     private static func order(_ kind: StyleSpan.Kind) -> Int {
         switch kind {
-        case .heading, .codeBlock, .blockQuote, .thematicBreak: 0
+        case .heading, .codeBlock, .blockQuote, .thematicBreak, .blankLine: 0
         case .inlineCode, .codeToken: 1
         case .strong, .emphasis, .strikethrough, .link, .marker, .completedTask, .tableRow, .tableCell: 2
         case .syntax, .taskMarker, .tablePipe: 3
@@ -257,7 +315,7 @@ enum MarkdownTheme {
 
     // MARK: Tables
 
-    static let tableCellPadding: CGFloat = 10
+    static let tableCellPadding: CGFloat = 12
 
     private static func tableRowParagraphStyle(_ role: TableRowRole) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
@@ -296,19 +354,48 @@ enum MarkdownTheme {
                 let scale = max(availableWidth / natural * 0.98, minimumTableScale)
                 scaleFonts(in: table, of: storage, by: scale)
                 natural = naturalWidth(of: cells, in: storage)
-                if natural > availableWidth { clipRows(tableSpans, in: storage) }
+                if natural > availableWidth {
+                    clipRows(tableSpans, in: storage)
+                    alignColumns(cells, in: storage, fillWidth: 0)
+                    continue
+                }
             }
-            alignColumns(cells, in: storage)
+            // Tables span the whole text column, like in Typora; 1 pt is left for the right border.
+            alignColumns(cells, in: storage, fillWidth: max(availableWidth - 1, 0))
         }
+    }
+
+    /// The cell's text without the spaces around it, which are hidden: padding comes from kern.
+    private static func contentRange(of cell: NSRange, in text: NSString) -> NSRange {
+        var start = cell.location
+        var end = NSMaxRange(cell)
+        func isSpace(_ index: Int) -> Bool {
+            let character = text.character(at: index)
+            return character == unichar(UInt8(ascii: " ")) || character == unichar(UInt8(ascii: "\t"))
+        }
+        while start < end, isSpace(start) { start += 1 }
+        while end > start, isSpace(end - 1) { end -= 1 }
+        return NSRange(location: start, length: end - start)
+    }
+
+    private static func contentWidth(of cell: NSRange, in storage: NSTextStorage) -> CGFloat {
+        let content = contentRange(of: cell, in: storage.string as NSString)
+        return content.length > 0 ? storage.attributedSubstring(from: content).size().width : 0
+    }
+
+    /// Width of each column once aligned: its widest cell text, without padding.
+    private static func columnWidths(of cells: [StyleSpan], in storage: NSTextStorage) -> [Int: CGFloat] {
+        var widths: [Int: CGFloat] = [:]
+        for cell in cells {
+            guard case .tableCell(let column, _) = cell.kind else { continue }
+            widths[column] = max(widths[column] ?? 0, contentWidth(of: cell.range, in: storage))
+        }
+        return widths
     }
 
     /// Width of the table once aligned: the widest cell of each column, plus cell padding.
     private static func naturalWidth(of cells: [StyleSpan], in storage: NSTextStorage) -> CGFloat {
-        var widths: [Int: CGFloat] = [:]
-        for cell in cells {
-            guard case .tableCell(let column, _) = cell.kind else { continue }
-            widths[column] = max(widths[column] ?? 0, storage.attributedSubstring(from: cell.range).size().width)
-        }
+        let widths = columnWidths(of: cells, in: storage)
         return widths.values.reduce(0, +) + CGFloat(widths.count) * 2 * tableCellPadding
     }
 
@@ -348,20 +435,31 @@ enum MarkdownTheme {
     }
 
     /// Lines up the columns: every cell is widened, with kern on the pipes around it, to the width
-    /// of the widest cell in its column. Alignment decides how the extra space is split.
-    private static func alignColumns(_ cells: [StyleSpan], in storage: NSTextStorage) {
+    /// of the widest cell in its column. Alignment decides how the extra space is split. When
+    /// `fillWidth` is larger than the table, the columns grow in proportion to their width until the
+    /// table fills it. The spaces around each cell's text are hidden, so only the text is measured
+    /// and right or centered alignment is exact whatever the source padding.
+    private static func alignColumns(_ cells: [StyleSpan], in storage: NSTextStorage, fillWidth: CGFloat) {
         let text = storage.string as NSString
         let pipe = unichar(UInt8(ascii: "|"))
-        var widths: [Int: CGFloat] = [:]
         var cellWidths: [CGFloat] = []
         for cell in cells {
-            guard case .tableCell(let column, _) = cell.kind else {
-                cellWidths.append(0)
-                continue
+            cellWidths.append(contentWidth(of: cell.range, in: storage))
+            let content = contentRange(of: cell.range, in: text)
+            let padding = [NSRange(location: cell.range.location, length: content.location - cell.range.location),
+                           NSRange(location: NSMaxRange(content), length: NSMaxRange(cell.range) - NSMaxRange(content))]
+            for range in padding where range.length > 0 {
+                storage.addAttributes([.font: hiddenFont, .foregroundColor: NSColor.clear], range: range)
             }
-            let width = storage.attributedSubstring(from: cell.range).size().width
-            cellWidths.append(width)
-            widths[column] = max(widths[column] ?? 0, width)
+        }
+        var widths = columnWidths(of: cells, in: storage)
+        let natural = widths.values.reduce(0, +) + CGFloat(widths.count) * 2 * tableCellPadding
+        if fillWidth > natural, !widths.isEmpty {
+            let weights = widths.mapValues { $0 + 2 * tableCellPadding }
+            let total = weights.values.reduce(0, +)
+            for (column, weight) in weights {
+                widths[column, default: 0] += ((fillWidth - natural) * weight / total).rounded(.down)
+            }
         }
 
         // All spacing goes on the hidden pipes: kern on a visible character right before a hidden pipe

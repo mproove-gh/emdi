@@ -40,9 +40,9 @@ struct EditorFonts {
 
     var size: CGFloat { CGFloat(settings.textSize) }
 
-    /// Headings scale with the text size (28 / 22 / 19 / 17 pt at the default 15 pt).
+    /// Headings scale with the text size (32 / 25 / 21 / 18 / 15 / 14 pt at the default 15 pt).
     func heading(level: Int) -> NSFont {
-        let ratios: [CGFloat] = [28, 22, 19, 17, 15, 15].map { $0 / 15 }
+        let ratios: [CGFloat] = [32, 25, 21, 18, 15, 14].map { $0 / 15 }
         let size = (self.size * ratios[min(max(level, 1), 6) - 1]).rounded()
         let bold = level <= 2
         if let font = Self.font(family: settings.textFamily, size: size, weight: bold ? 9 : 8) {
