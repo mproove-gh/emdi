@@ -30,6 +30,23 @@ enum ImageSource {
         return "![\(name)](\(needsBrackets ? "<\(path)>" : path))"
     }
 
+    /// Where a pasted image is saved: `image-YYYYMMDD-HHMMSS.png` in `folder`, with `-2`, `-3`, …
+    /// added when that name is taken.
+    static func pastedImageURL(in folder: URL, date: Date, exists: (URL) -> Bool) -> URL {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let c = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+        let stamp = String(format: "%04d%02d%02d-%02d%02d%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0,
+                           c.hour ?? 0, c.minute ?? 0, c.second ?? 0)
+        var url = folder.appending(path: "image-\(stamp).png")
+        var index = 2
+        while exists(url) {
+            url = folder.appending(path: "image-\(stamp)-\(index).png")
+            index += 1
+        }
+        return url
+    }
+
     static func relativePath(from folder: URL?, to file: URL) -> String? {
         guard let folder else { return nil }
         let base = folder.standardizedFileURL.pathComponents

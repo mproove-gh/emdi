@@ -44,4 +44,15 @@ struct ImageDropTests {
         #expect(ImageSource.markdown(forImageAt: url, relativeTo: document) == "![my cat (1)](<my cat (1).png>)")
         #expect(ImageSource.resolve("<my cat (1).png>", relativeTo: document)?.path == url.path)
     }
+
+    @Test func pastedImagesGetATimestampedNameThatIsFree() {
+        let folder = URL(fileURLWithPath: "/tmp/doc/images")
+        var components = DateComponents(year: 2026, month: 3, day: 4, hour: 5, minute: 6, second: 7)
+        components.timeZone = .current
+        let date = Calendar(identifier: .gregorian).date(from: components)!
+        #expect(ImageSource.pastedImageURL(in: folder, date: date) { _ in false }.lastPathComponent == "image-20260304-050607.png")
+        let taken: Set<String> = ["image-20260304-050607.png", "image-20260304-050607-2.png"]
+        #expect(ImageSource.pastedImageURL(in: folder, date: date) { taken.contains($0.lastPathComponent) }
+            .lastPathComponent == "image-20260304-050607-3.png")
+    }
 }

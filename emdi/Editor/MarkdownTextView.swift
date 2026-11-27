@@ -1,4 +1,5 @@
 import AppKit
+import QuickLookUI
 import UniformTypeIdentifiers
 
 /// Carries a `FormatCommand` through the responder chain from the SwiftUI Format menu.
@@ -134,6 +135,10 @@ final class MarkdownTextView: NSTextView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         if toggleTask(at: point) { return }
+        if event.clickCount == 2, let url = imageURL(at: point) {
+            showQuickLook(for: url)
+            return
+        }
         let plainClick = event.clickCount == 1 && event.modifierFlags.intersection([.shift, .command, .option]).isEmpty
         let cell = plainClick ? tableCell(at: point) : nil
         super.mouseDown(with: event)  // Tracks the mouse until it is released.
@@ -237,15 +242,101 @@ final class MarkdownTextView: NSTextView {
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let images = droppedImageURLs(sender)
         guard !images.isEmpty, isEditable else { return super.performDragOperation(sender) }
+        let location = characterIndexForInsertion(at: convert(sender.draggingLocation, from: nil))
+        window?.makeFirstResponder(self)
+        insertImages(images, at: location, actionName: images.count == 1 ? "Insert Image" : "Insert Images")
+        return true
+    }
+
+    /// One `![name](path)` paragraph per image file, at `location`, as one undoable edit.
+    private func insertImages(_ images: [URL], at location: Int, actionName: String) {
         let markdown = images.map { ImageSource.markdown(forImageAt: $0, relativeTo: documentURL) }
             .joined(separator: "\n\n") + "\n"
-        let location = characterIndexForInsertion(at: convert(sender.draggingLocation, from: nil))
         let end = (markdown as NSString).length - 1
         let edit = MarkdownFormatter.insertBlock(markdown, select: NSRange(location: end, length: 0),
                                                  in: string as NSString, selection: NSRange(location: location, length: 0))
-        window?.makeFirstResponder(self)
-        apply(edit, actionName: images.count == 1 ? "Insert Image" : "Insert Images")
+        apply(edit, actionName: actionName)
+    }
+
+    // MARK: Pasting images
+
+    override var readablePasteboardTypes: [NSPasteboard.PasteboardType] {
+        super.readablePasteboardTypes + [.png, .tiff]
+    }
+
+    override func paste(_ sender: Any?) {
+        if isEditable, pasteImage(from: .general) { return }
+        super.paste(sender)
+    }
+
+    /// Image files copied in the Finder are referenced where they are, like dropped ones. Image data
+    /// (a screenshot, an image copied in a browser) is saved as a PNG in an `images` folder next to the
+    /// document, then referenced. Returns false when the pasteboard holds no image, or holds text.
+    func pasteImage(from pasteboard: NSPasteboard) -> Bool {
+        let files = pasteboard.readObjects(forClasses: [NSURL.self], options: Self.imageReadingOptions) as? [URL] ?? []
+        if !files.isEmpty {
+            insertImages(files, at: selectedRange().location, actionName: "Paste Image")
+            return true
+        }
+        guard pasteboard.string(forType: .string) == nil, let data = Self.pngData(from: pasteboard) else { return false }
+        guard let documentURL else {
+            let alert = NSAlert()
+            alert.messageText = "Save the document first"
+            alert.informativeText = "emdi saves pasted images in an “images” folder next to the document, so the document needs a place on disk."
+            if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+            return true
+        }
+        let folder = documentURL.deletingLastPathComponent().appending(path: "images")
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let url = ImageSource.pastedImageURL(in: folder, date: Date()) { FileManager.default.fileExists(atPath: $0.path) }
+            try data.write(to: url, options: .withoutOverwriting)
+            insertImages([url], at: selectedRange().location, actionName: "Paste Image")
+        } catch {
+            let alert = NSAlert(error: error)
+            if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+        }
         return true
+    }
+
+    private static func pngData(from pasteboard: NSPasteboard) -> Data? {
+        if let png = pasteboard.data(forType: .png) { return png }
+        guard let tiff = pasteboard.data(forType: .tiff), let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
+        return bitmap.representation(using: .png, properties: [:])
+    }
+
+    // MARK: Quick Look
+
+    /// The image Quick Look shows, set by a double-click on it.
+    private var previewURL: URL?
+
+    /// The file of the loaded image drawn under `point`, if any.
+    func imageURL(at point: NSPoint) -> URL? {
+        guard let layoutManager = textLayoutManager else { return nil }
+        let origin = textContainerOrigin
+        guard let fragment = layoutManager.textLayoutFragment(for: CGPoint(x: point.x - origin.x, y: point.y - origin.y))
+                as? ImageLayoutFragment,
+              let image = fragment.blockImage, image.image != nil, let url = image.url,
+              let rect = fragment.imageRect else { return nil }
+        let frame = fragment.layoutFragmentFrame
+        return rect.offsetBy(dx: frame.minX + origin.x, dy: frame.minY + origin.y).contains(point) ? url : nil
+    }
+
+    private func showQuickLook(for url: URL) {
+        previewURL = url
+        guard let panel = QLPreviewPanel.shared() else { return }
+        if panel.isVisible { panel.reloadData() } else { panel.makeKeyAndOrderFront(nil) }
+    }
+
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { previewURL != nil }
+
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        panel.dataSource = self
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        panel.dataSource = nil
+        previewURL = nil
     }
 
     // MARK: List editing
@@ -497,4 +588,12 @@ final class CopyCodeButton: NSButton {
     }
 
     override var isFlipped: Bool { true }
+}
+
+extension MarkdownTextView: @preconcurrency QLPreviewPanelDataSource {
+    func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int { previewURL == nil ? 0 : 1 }
+
+    func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! {
+        previewURL as NSURL?
+    }
 }

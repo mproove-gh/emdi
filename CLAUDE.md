@@ -87,12 +87,14 @@ open build/Build/Products/Debug/emdi.app                           # run
 
 ## Local images (implemented)
 
-- Only an image that is **alone in its paragraph** is shown as an image (`StyleSpan.Kind.blockImage`). An image inside a line of text keeps link styling, and so does an image whose file can't be loaded.
+- Only an image that is **alone in its paragraph** is shown as an image (`StyleSpan.Kind.blockImage`). An image inside a line of text keeps link styling, and so do remote images and relative paths in an unsaved document. A local file that can't be loaded gets a placeholder instead: `BlockImage(missing:)`, drawn by `ImageLayoutFragment` as a dashed frame with an icon and "Image not found: path". `ThemeContext.resolve` tells local files from the rest.
 - `ImageSource.resolve` maps the destination to a file. Relative paths are resolved against the folder of the document's `fileURL`, which `DocumentGroup` passes in through `MarkdownEditorView(fileURL:)`. Remote URLs are deliberately never loaded: no network access. An unsaved document can only show absolute paths.
 - `ImageCache` (in `MarkdownEditorView.swift`) reloads an image when its file's modification date changes, and doesn't cache missing files.
 - `MarkdownTheme` scales the image to the text width (never up), puts a `BlockImage` in `.blockImage`, and reserves the height with `paragraphSpacingBefore`. `ImageLayoutFragment` draws the image in that space. The `![alt](path)` line is hidden, and shown small and dimmed while the caret is in it.
 - The coordinator restyles when the text view's width changes, but only if the document has block images.
 - Dropping image files onto the editor (`MarkdownTextView.performDragOperation`) inserts one `![name](path)` paragraph per image at the drop point, through `MarkdownFormatter.insertBlock`. `ImageSource.markdown(forImageAt:relativeTo:)` builds the path: relative to the document folder (`../` allowed) when the document is saved, absolute when it isn't or when the image is on another volume, and `<…>` around paths with spaces or parentheses. Files are referenced where they are, not copied. Other drops keep NSTextView's default behaviour.
+- Pasting (`MarkdownTextView.pasteImage`, from `paste(_:)`): image files copied in the Finder are referenced like dropped ones. Image data with no text on the pasteboard (a screenshot, an image copied in a browser) is saved as PNG in an `images` folder next to the document, named by `ImageSource.pastedImageURL` (`image-YYYYMMDD-HHMMSS.png`, `-2`… when taken), then referenced. An unsaved document gets an alert instead. `readablePasteboardTypes` adds PNG and TIFF so Paste is enabled for image-only pasteboards.
+- Double-clicking a loaded image (`imageURL(at:)`, hit-testing `ImageLayoutFragment.imageRect`) opens its file in Quick Look: the text view is the `QLPreviewPanel` controller and data source.
 
 ## Code highlighting (implemented)
 
@@ -147,6 +149,10 @@ open build/Build/Products/Debug/emdi.app                           # run
 - Bold and italic (`MarkdownTheme.addTrait`) use the font's real variant only if converting actually changed the font: a heavier weight, or another italic face. Some families (AppleGothic, for example) have none, and AppKit may still report the trait. Those get faux bold (`.strokeWidth` -6) and faux italic (the same font with a sheared matrix from `fontDescriptor.withMatrix`; `.obliqueness` is ignored by TextKit 2). Headings in such fonts get the faux bold too. Known limit: bold plus italic in such a font shows only the italic, because the stroke doesn't apply to a sheared font.
 - Every `MarkdownEditorView.Coordinator` observes `UserDefaults.didChangeNotification` and restyles when `FontSettings` changed, so open documents update live.
 - Tests that touch font settings must use a separate `UserDefaults(suiteName:)` or remove the keys afterwards: the test host is the real app, so `UserDefaults.standard` is the user's own emdi preferences.
+
+## Default app for Markdown files (implemented)
+
+- Settings ▸ Editing ▸ Markdown Files shows whether the Finder opens .md files with this copy of emdi, and a Make Default button. `DefaultMarkdownApp` (`emdi/App/DefaultMarkdownApp.swift`) checks `NSWorkspace.urlForApplication(toOpen:)` and calls `setDefaultApplication(at:toOpen:)` for the system's type of `.md` / `.markdown` and emdi's `net.daringfireball.markdown`. macOS may ask the user to confirm. The registration points at the app's current location.
 
 ## Closing documents and quitting (implemented)
 

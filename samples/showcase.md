@@ -369,7 +369,7 @@ A small local image, never scaled up:
 
 An image inside a line of text keeps link styling: here it is ![inline icon](images/emdi-icon-small.png) in the middle of a sentence.
 
-A missing image keeps link styling:
+A missing image shows a placeholder:
 
 ![This file does not exist](images/missing.png)
 
@@ -422,4 +422,6 @@ Vivamus facilisis diam at odio. Mauris dictum, nisi eget consequat elementum, la
 - [ ] Press Tab in a table to move from cell to cell, and in the last cell to add a row
 - [ ] Right-click in a table and use the Table submenu
 - [ ] Drop an image file from the Finder onto the editor
+- [ ] Paste a screenshot (⌘V): it is saved in images/ next to this file
+- [ ] Double-click an image to open it in Quick Look
 - [ ] Switch between light and dark mode, and change fonts in Settings

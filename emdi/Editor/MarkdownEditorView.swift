@@ -129,9 +129,10 @@ struct MarkdownEditorView: NSViewRepresentable {
             guard width > 0 else { return .none }
             let documentURL = fileURL
             let cache = imageCache
-            return ThemeContext(availableWidth: width) { source in
-                ImageSource.resolve(source, relativeTo: documentURL).flatMap(cache.image(at:))
-            }
+            return ThemeContext(
+                availableWidth: width,
+                image: { source in ImageSource.resolve(source, relativeTo: documentURL).flatMap(cache.image(at:)) },
+                resolve: { source in ImageSource.resolve(source, relativeTo: documentURL) })
         }
 
         func reparse() {

@@ -5,6 +5,8 @@ struct ThemeContext {
     /// 0 when the width is not known yet: images are then not shown and tables are not fitted.
     var availableWidth: CGFloat
     var image: (String) -> NSImage?
+    /// The local file an image source points to, whether or not it exists. Nil for remote images.
+    var resolve: (String) -> URL? = { _ in nil }
 
     static var none: ThemeContext { ThemeContext(availableWidth: 0, image: { _ in nil }) }
 }
@@ -212,14 +214,26 @@ enum MarkdownTheme {
             case .tableCell:
                 break  // Laid out by alignTableColumns once every font is final.
             case .blockImage(let source):
-                guard context.availableWidth > 0, let image = context.image(source), image.size.width > 0, image.size.height > 0 else { break }
+                guard context.availableWidth > 0 else { break }
+                guard let image = context.image(source), image.size.width > 0, image.size.height > 0 else {
+                    // A local file that can't be loaded gets a placeholder, so the missing image shows.
+                    // Remote images (never loaded) and unresolvable paths keep their link styling.
+                    if let url = context.resolve(source) {
+                        let placeholder = BlockImage(missing: missingImageLabel(source, fonts: fonts), url: url,
+                                                     size: CGSize(width: min(context.availableWidth, (fonts.size * 30).rounded()),
+                                                                  height: (fonts.size * 3).rounded()))
+                        styleImageParagraph(range, with: placeholder, active: StyleSpan.isActive(block: span.blockRange, selection: selection),
+                                            in: storage, fonts: fonts)
+                    }
+                    break
+                }
                 let scale = min(1, context.availableWidth / image.size.width)
                 let size = CGSize(width: (image.size.width * scale).rounded(), height: (image.size.height * scale).rounded())
                 // The image is drawn in the space reserved above the line. The source line itself is shown,
                 // small and dimmed, only while the caret is in it; otherwise it is hidden.
                 let active = StyleSpan.isActive(block: span.blockRange, selection: selection)
                 var attributes: [NSAttributedString.Key: Any] = [
-                    .blockImage: BlockImage(image: image, size: size),
+                    .blockImage: BlockImage(image: image, url: context.resolve(source), size: size),
                     .paragraphStyle: imageParagraphStyle(imageHeight: size.height),
                     .underlineStyle: 0,
                 ]
@@ -457,6 +471,25 @@ enum MarkdownTheme {
         case .attribute: EditorPalette.codeAttribute
         case .property: EditorPalette.codeProperty
         }
+    }
+
+    private static func styleImageParagraph(_ range: NSRange, with image: BlockImage, active: Bool,
+                                            in storage: NSTextStorage, fonts: EditorFonts) {
+        var attributes: [NSAttributedString.Key: Any] = [
+            .blockImage: image,
+            .paragraphStyle: imageParagraphStyle(imageHeight: image.size.height),
+            .underlineStyle: 0,
+        ]
+        attributes[.font] = active ? fonts.body.withSize(fonts.size - 3) : hiddenFont
+        attributes[.foregroundColor] = active ? EditorPalette.syntax : NSColor.clear
+        storage.addAttributes(attributes, range: range)
+    }
+
+    private static func missingImageLabel(_ source: String, fonts: EditorFonts) -> NSAttributedString {
+        NSAttributedString(string: "Image not found: \(source)", attributes: [
+            .font: NSFont.systemFont(ofSize: (fonts.size * 0.8).rounded()),
+            .foregroundColor: EditorPalette.secondaryText,
+        ])
     }
 
     private static func imageParagraphStyle(imageHeight: CGFloat) -> NSParagraphStyle {

@@ -210,4 +210,51 @@ struct EditorInteractionTests {
         let font = try #require(host.textView.textStorage?.attribute(.font, at: try host.location(of: "let b"), effectiveRange: nil) as? NSFont)
         #expect(abs(line.layoutFragmentFrame.height - (font.pointSize * 1.32).rounded()) < 0.5)
     }
+
+    @Test func missingLocalImagesGetAPlaceholderAndLoadedOnesOpenInQuickLook() throws {
+        let host = try EditorTestHost()  // showcase.md, so relative paths resolve
+        defer { host.close() }
+        host.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        host.pump()
+        let missing = try #require(host.fragment(at: try host.location(of: "![This file does not exist]")) as? ImageLayoutFragment)
+        #expect(missing.blockImage?.missingLabel?.string == "Image not found: images/missing.png")
+        // Remote images are never loaded and keep their link styling.
+        #expect(!(host.fragment(at: try host.location(of: "![Remote image]")) is ImageLayoutFragment))
+
+        // A double-click target: the loaded image's file, and nothing for the placeholder.
+        let large = try #require(host.fragment(at: try host.location(of: "![The emdi icon, large]")) as? ImageLayoutFragment)
+        let rect = try #require(large.imageRect)
+        let inImage = host.viewPoint(CGPoint(x: rect.midX, y: rect.midY), in: large)
+        #expect(host.textView.imageURL(at: inImage)?.lastPathComponent == "emdi-icon-large.png")
+        let placeholder = try #require(missing.imageRect)
+        #expect(host.textView.imageURL(at: host.viewPoint(CGPoint(x: placeholder.midX, y: placeholder.midY), in: missing)) == nil)
+    }
+
+    @Test func pastedImageDataIsSavedNextToTheDocument() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "emdi-paste-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let host = try EditorTestHost(text: "Before.\n")
+        defer { host.close() }
+        host.textView.documentURL = folder.appending(path: "doc.md")
+        host.textView.setSelectedRange(NSRange(location: 8, length: 0))
+
+        let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 3, bitsPerSample: 8, samplesPerPixel: 4,
+                                      hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("emdi-test-\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.declareTypes([.png], owner: nil)
+        pasteboard.setData(bitmap.representation(using: .png, properties: [:]), forType: .png)
+
+        #expect(host.textView.pasteImage(from: pasteboard))
+        let saved = try FileManager.default.contentsOfDirectory(at: folder.appending(path: "images"), includingPropertiesForKeys: nil)
+        #expect(saved.count == 1)
+        let name = try #require(saved.first?.lastPathComponent)
+        #expect(host.textView.string.contains("](images/\(name))"))
+
+        // Text on the pasteboard is pasted as text, not as an image.
+        pasteboard.declareTypes([.string, .png], owner: nil)
+        pasteboard.setString("hello", forType: .string)
+        #expect(!host.textView.pasteImage(from: pasteboard))
+    }
 }

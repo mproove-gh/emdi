@@ -293,9 +293,46 @@ private struct EditingPane: View {
                      : "Changes are saved when you choose File ▸ Save (⌘S). Closing a document with unsaved changes asks whether to save them.")
                     .foregroundStyle(.secondary)
             }
+
+            DefaultAppSection()
         }
         .formStyle(.grouped)
         .settingsBackground()
+    }
+}
+
+/// Whether the Finder opens Markdown files with emdi, and a button to make it so.
+private struct DefaultAppSection: View {
+    @State private var isDefault = DefaultMarkdownApp.isEmdi
+    @State private var failure: String?
+
+    var body: some View {
+        Section {
+            LabeledContent("Open Markdown files with emdi") {
+                if isDefault {
+                    Label("Default", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Button("Make Default") {
+                        Task {
+                            do {
+                                try await DefaultMarkdownApp.makeEmdiDefault()
+                                failure = nil
+                            } catch {
+                                failure = error.localizedDescription
+                            }
+                            isDefault = DefaultMarkdownApp.isEmdi
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("Markdown Files")
+        } footer: {
+            Text(failure ?? "Double-clicking a .md file in the Finder then opens it in emdi. This copy of emdi is the one registered: if you move the app, make it the default again.")
+                .foregroundStyle(failure == nil ? .secondary : Color.red)
+        }
+        .onAppear { isDefault = DefaultMarkdownApp.isEmdi }
     }
 }
 
