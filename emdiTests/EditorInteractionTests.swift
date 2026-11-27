@@ -176,4 +176,18 @@ struct EditorInteractionTests {
         #expect(shown.calloutTitle == nil)
         #expect(abs(shown.layoutFragmentFrame.height - hiddenHeight) < 1)
     }
+
+    @Test func narrowTablesKeepTheirWidthAndWideOnesFillTheColumn() throws {
+        let wideCell = String(repeating: "word ", count: 14)
+        let host = try EditorTestHost(text: "| A | B |\n|---|---|\n| 1 | 2 |\n\n| Long | Text |\n|---|---|\n| \(wideCell)| x |\n")
+        defer { host.close() }
+        let column = try #require(host.textView.textContainer?.size.width)
+        func width(_ needle: String) throws -> CGFloat {
+            let fragment = try #require(host.fragment(at: try host.location(of: needle)) as? TableRowLayoutFragment)
+            let borders = fragment.cellBorders.map(\.x)
+            return try #require(borders.max()) - (try #require(borders.min()))
+        }
+        #expect(try width("| 1 | 2 |") < column / 3)
+        #expect(try width("| Long |") > column - 20)
+    }
 }

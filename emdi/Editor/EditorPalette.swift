@@ -16,8 +16,11 @@ enum EditorPalette {
     static let link = dynamic(light: 0x1C58B3, dark: 0x6AA8F7)
     static let inlineCodeBackground = dynamic(light: 0xE4E0D7, dark: 0x2B2B2E)
     static let codeBlockBackground = dynamic(light: 0xE7E3DA, dark: 0x262629)
-    static let tableHeaderBackground = dynamic(light: 0xE7E3DA, dark: 0x28282B)
+    static let tableHeaderBackground = dynamic(light: 0xE5E1D7, dark: 0x2D2D31)
     static let border = dynamic(light: 0xD0CCC2, dark: 0x3C3C40)
+    /// Every other table row, and the quieter lines between table columns.
+    static let tableStripe = dynamic(light: 0xE9E6DE, dark: 0x252528)
+    static let tableColumnRule = dynamic(light: 0xDEDAD1, dark: 0x313135)
     /// The bars down the side of block quotes.
     static let quoteBar = dynamic(light: 0xD3CEC4, dark: 0x45454A)
     static let checkbox = dynamic(light: 0x85837D, dark: 0x7D7C80)

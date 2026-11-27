@@ -452,6 +452,9 @@ enum MarkdownTheme {
         return style
     }
 
+    /// A table narrower than this share of the text column keeps its natural width.
+    static let narrowTableRatio: CGFloat = 2.0 / 3.0
+
     /// Smallest font scale used to fit a wide table in the window.
     static let minimumTableScale: CGFloat = 0.75
 
@@ -486,8 +489,10 @@ enum MarkdownTheme {
                     continue
                 }
             }
-            // Tables span the whole text column, like in Typora; 1 pt is left for the right border.
-            alignColumns(cells, in: storage, fillWidth: max(availableWidth - 1, 0))
+            // Tables span the whole text column, like in Typora (1 pt is left for the right border),
+            // unless they are narrow: stretching a two-column table across the page only spreads it out.
+            let fills = natural >= availableWidth * narrowTableRatio
+            alignColumns(cells, in: storage, fillWidth: fills ? max(availableWidth - 1, 0) : 0)
         }
     }
 

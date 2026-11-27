@@ -82,6 +82,8 @@ final class MarkdownLayoutDelegate: NSObject, NSTextLayoutManagerDelegate {
         if let role = string.attribute(.tableRow, at: 0, effectiveRange: nil) as? Int {
             let fragment = TableRowLayoutFragment(textElement: textElement, range: range)
             fragment.role = TableRowRole(rawValue: role)
+            fragment.isClipped = (string.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?
+                .lineBreakMode == .byClipping
             string.enumerateAttribute(.tablePipe, in: whole, options: .longestEffectiveRangeNotRequired) { value, pipes, _ in
                 guard let offset = value as? CGFloat else { return }
                 for index in pipes.location..<NSMaxRange(pipes) {

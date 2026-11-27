@@ -77,6 +77,8 @@ struct TableRowRole: OptionSet, Equatable, Sendable {
     static let delimiter = TableRowRole(rawValue: 1 << 1)
     static let first = TableRowRole(rawValue: 1 << 2)
     static let last = TableRowRole(rawValue: 1 << 3)
+    /// Every other body row (the second, fourth, …), drawn with a faint fill.
+    static let striped = TableRowRole(rawValue: 1 << 4)
 }
 
 enum TableAlignment: Equatable, Sendable {
@@ -314,6 +316,7 @@ private struct SpanWalker {
             var role: TableRowRole = index == 0 ? .header : index == 1 ? .delimiter : []
             if index == 0 { role.insert(.first) }
             if index == lines.count - 1 { role.insert(.last) }
+            if index >= 2, (index - 2) % 2 == 1 { role.insert(.striped) }
             spans.append(StyleSpan(kind: .tableRow(role), range: line, blockRange: block))
 
             var pipes: [Int] = []

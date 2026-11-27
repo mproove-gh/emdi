@@ -66,6 +66,15 @@ struct MarkdownStylerTests {
         #expect(MarkdownStyler.spans(for: text).filter { if case .callout = $0.kind { true } else { false } }.count == 1)
     }
 
+    @Test func everyOtherBodyRowIsStriped() {
+        let text = "| a |\n| - |\n| 1 |\n| 2 |\n| 3 |\n| 4 |"
+        let striped = MarkdownStyler.spans(for: text).compactMap { span -> String? in
+            guard case .tableRow(let role) = span.kind, role.contains(.striped) else { return nil }
+            return (text as NSString).substring(with: span.range)
+        }
+        #expect(striped == ["| 2 |", "| 4 |"])
+    }
+
     @Test func quoteMarkersKnowTheirDepth() {
         let text = "> a\n>\n> > b\n>> c"
         #expect(ranges(.quoteMarker(depth: 1, blank: false), in: text) == [r(0, 2)])
