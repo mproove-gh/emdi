@@ -190,4 +190,24 @@ struct EditorInteractionTests {
         #expect(try width("| 1 | 2 |") < column / 3)
         #expect(try width("| Long |") > column - 20)
     }
+
+    @Test func fencedBlocksHaveAHeaderAndTightLines() throws {
+        let host = try EditorTestHost(text: "Intro.\n\n```swift\nlet a = 1\nlet b = 2\n```\n\n```\nplain\n```\n\n    indented\n\nEnd.\n")
+        defer { host.close() }
+        host.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        host.pump()
+        let swift = try #require(host.fragment(at: try host.location(of: "```swift")) as? CodeBlockLayoutFragment)
+        #expect(swift.edges.contains(.header))
+        #expect(swift.languageLabel?.string == "swift" && swift.copyLabel?.string == "Copy")
+        // A block without a language still gets the header, with Copy.
+        let plain = try #require(host.fragment(at: try host.location(of: "```\nplain")) as? CodeBlockLayoutFragment)
+        #expect(plain.edges.contains(.header) && plain.languageLabel == nil && plain.copyLabel != nil)
+        // An indented block has no fence, so no header.
+        let indented = try #require(host.fragment(at: try host.location(of: "    indented")) as? CodeBlockLayoutFragment)
+        #expect(!indented.edges.contains(.header))
+        // Code lines are 1.32 × the code size, whatever the font's own line height.
+        let line = try #require(host.fragment(at: try host.location(of: "let b")))
+        let font = try #require(host.textView.textStorage?.attribute(.font, at: try host.location(of: "let b"), effectiveRange: nil) as? NSFont)
+        #expect(abs(line.layoutFragmentFrame.height - (font.pointSize * 1.32).rounded()) < 0.5)
+    }
 }

@@ -22,20 +22,16 @@ final class MarkdownTextView: NSTextView {
     private var hoveredCodeBlock: NSRange?
     private var hoverTrackingArea: NSTrackingArea?
 
-    private lazy var copyButton: NSButton = {
-        let button = NSButton(image: Self.copyImage, target: self, action: #selector(copyHoveredCodeBlock))
-        button.bezelStyle = .accessoryBarAction
-        button.isBordered = true
+    private lazy var copyButton: CopyCodeButton = {
+        let button = CopyCodeButton(frame: .zero)
+        button.target = self
+        button.action = #selector(copyHoveredCodeBlock)
         button.toolTip = "Copy Code"
         button.setAccessibilityLabel("Copy Code")
-        button.frame.size = NSSize(width: 26, height: 22)
         button.isHidden = true
         addSubview(button)
         return button
     }()
-
-    private static let copyImage = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "Copy Code")!
-    private static let copiedImage = NSImage(systemSymbolName: "checkmark", accessibilityDescription: "Copied")!
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -90,12 +86,22 @@ final class MarkdownTextView: NSTextView {
 
         guard let start = content.location(content.documentRange.location, offsetBy: block.location),
               let first = layoutManager.textLayoutFragment(for: start) else { return }
-        let lineTop = first.layoutFragmentFrame.minY + (first.textLineFragments.first?.typographicBounds.minY ?? 0)
-        let panelTop = lineTop - CodeBlockLayoutFragment.verticalPadding
         let containerWidth = textContainer?.size.width ?? bounds.width
-        let size = copyButton.frame.size
-        copyButton.setFrameOrigin(NSPoint(x: origin.x + containerWidth - size.width - 6, y: origin.y + panelTop + 4))
-        copyButton.image = Self.copyImage
+        let fonts = EditorFonts()
+        let label = MarkdownTheme.copyLabel(fonts: fonts, copied: false)
+        if let header = first as? CodeBlockLayoutFragment, header.edges.contains(.header), let line = header.textLineFragments.first {
+            // Over the header's drawn Copy label, in the text color.
+            let midY = origin.y + header.layoutFragmentFrame.minY + line.typographicBounds.midY
+            let rect = CodeBlockLayoutFragment.copyRect(for: label, panelMaxX: origin.x + containerWidth, midY: midY)
+            copyButton.frame = rect.insetBy(dx: -5, dy: -3)
+        } else {
+            // An indented block has no header: the button goes in its top right corner.
+            let lineTop = first.layoutFragmentFrame.minY + (first.textLineFragments.first?.typographicBounds.minY ?? 0)
+            let rect = CodeBlockLayoutFragment.copyRect(for: label, panelMaxX: origin.x + containerWidth, midY: origin.y + lineTop + 6)
+            copyButton.frame = rect.insetBy(dx: -5, dy: -3)
+        }
+        copyButton.fonts = fonts
+        copyButton.copied = false
         copyButton.isHidden = false
         hoveredCodeBlock = block
     }
@@ -111,10 +117,10 @@ final class MarkdownTextView: NSTextView {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(code, forType: .string)
 
-        copyButton.image = Self.copiedImage
+        copyButton.copied = true
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(1.2))
-            self?.copyButton.image = Self.copyImage
+            self?.copyButton.copied = false
         }
     }
 
@@ -455,4 +461,40 @@ extension ShortcutModifiers {
         if contains(.control) { flags.insert(.control) }
         return flags
     }
+}
+
+/// The Copy button of the hovered code block. It draws exactly like the header's own Copy label,
+/// over it, in the text color instead of the quieter one, and says "Copied" for a moment after a click.
+final class CopyCodeButton: NSButton {
+    var fonts = EditorFonts() { didSet { needsDisplay = true } }
+    var copied = false {
+        didSet {
+            // "Copied" is wider than "Copy": grow to the left, keeping the right edge.
+            let label = MarkdownTheme.copyLabel(fonts: fonts, copied: copied).size()
+            let width = label.height + 4 + label.width + 10
+            frame = NSRect(x: frame.maxX - width, y: frame.minY, width: width, height: frame.height)
+            needsDisplay = true
+        }
+    }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        isBordered = false
+        title = ""
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func draw(_ dirtyRect: NSRect) {
+        EditorPalette.codeBlockBackground.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 5, yRadius: 5).fill()
+        let label = NSMutableAttributedString(attributedString: MarkdownTheme.copyLabel(fonts: fonts, copied: copied))
+        label.addAttribute(.foregroundColor, value: EditorPalette.text, range: NSRange(location: 0, length: label.length))
+        let size = label.size()
+        let width = size.height + 4 + size.width
+        // Same place as the drawn label: the frame is that label's rect grown by 5 × 3 points.
+        CodeBlockLayoutFragment.drawCopy(label, in: CGRect(x: 5, y: 3, width: width, height: size.height))
+    }
+
+    override var isFlipped: Bool { true }
 }

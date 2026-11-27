@@ -5,6 +5,8 @@ struct CodeBlockEdges: OptionSet {
     let rawValue: Int
     static let top = CodeBlockEdges(rawValue: 1 << 0)
     static let bottom = CodeBlockEdges(rawValue: 1 << 1)
+    /// The opening fence of a fenced block, drawn as a header: language, Copy, and a rule under it.
+    static let header = CodeBlockEdges(rawValue: 1 << 2)
 }
 
 /// Lays out one line of a code block and paints its background across the whole text container width.
@@ -17,6 +19,13 @@ final class CodeBlockLayoutFragment: MarkdownLayoutFragment {
     /// The block's language, drawn on its hidden opening fence. Drawing only: it is not in the text,
     /// so it is never copied.
     var languageLabel: NSAttributedString?
+    /// The header's "Copy" label, drawn at the right. Hovering the block puts a real button over it.
+    var copyLabel: NSAttributedString?
+
+    /// Space between the header's rule and the first line of code.
+    static let headerGap: CGFloat = 8
+    /// How far the Copy label sits from the panel's right edge.
+    static let copyInset: CGFloat = 12
 
     /// The panel rect in fragment coordinates.
     private var panelRect: CGRect {
@@ -24,7 +33,9 @@ final class CodeBlockLayoutFragment: MarkdownLayoutFragment {
         let width = textLayoutManager?.textContainer?.size.width ?? frame.width
         var top: CGFloat = 0
         var bottom = frame.height
-        if edges.contains(.top) {
+        if edges.contains(.header) {
+            top = textLineFragments.first?.typographicBounds.minY ?? 0
+        } else if edges.contains(.top) {
             top = (textLineFragments.first?.typographicBounds.minY ?? 0) - Self.verticalPadding
         }
         if edges.contains(.bottom) {
@@ -54,17 +65,53 @@ final class CodeBlockLayoutFragment: MarkdownLayoutFragment {
         context.fillPath()
         context.restoreGState()
 
-        if let languageLabel, let line = textLineFragments.first {
+        if edges.contains(.header), let line = textLineFragments.first {
             let bounds = line.typographicBounds
-            let size = languageLabel.size()
-            let x = bounds.minX + line.locationForCharacter(at: 0).x
-            let origin = CGPoint(x: point.x + x, y: point.y + bounds.midY - size.height / 2)
+            // The rule under the header, across the panel.
+            context.saveGState()
+            context.setFillColor(EditorPalette.border.cgColor)
+            context.fill(CGRect(x: panel.minX, y: point.y + bounds.maxY, width: panel.width, height: 1))
+            context.restoreGState()
+
             NSGraphicsContext.saveGraphicsState()
             NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
-            languageLabel.draw(at: origin)
+            if let languageLabel {
+                let size = languageLabel.size()
+                let x = bounds.minX + line.locationForCharacter(at: 0).x
+                languageLabel.draw(at: CGPoint(x: point.x + x, y: point.y + bounds.midY - size.height / 2))
+            }
+            if let copyLabel {
+                let rect = Self.copyRect(for: copyLabel, panelMaxX: panel.maxX, midY: point.y + bounds.midY)
+                Self.drawCopy(copyLabel, in: rect)
+            }
             NSGraphicsContext.restoreGraphicsState()
         }
 
         super.draw(at: point, in: context)
+    }
+
+    /// Where the Copy icon and label go, right-aligned in the header, in the coordinates of `panelMaxX` and `midY`.
+    static func copyRect(for label: NSAttributedString, panelMaxX: CGFloat, midY: CGFloat) -> CGRect {
+        let size = label.size()
+        let width = size.height + 4 + size.width
+        return CGRect(x: panelMaxX - copyInset - width, y: midY - size.height / 2, width: width, height: size.height)
+    }
+
+    /// The copy icon then the label, in the label's own color.
+    static func drawCopy(_ label: NSAttributedString, in rect: CGRect) {
+        let color = label.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor ?? .secondaryLabelColor
+        let font = label.attribute(.font, at: 0, effectiveRange: nil) as? NSFont ?? .systemFont(ofSize: 11)
+        let configuration = NSImage.SymbolConfiguration(pointSize: font.pointSize * 0.9, weight: .medium)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [color]))
+        if let image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration) {
+            let side = rect.height
+            let aspect = image.size.width / max(image.size.height, 1)
+            let iconHeight = min(side, side / max(aspect, 1)) * 0.85
+            let iconWidth = iconHeight * aspect
+            image.draw(in: CGRect(x: rect.minX + (side - iconWidth) / 2, y: rect.midY - iconHeight / 2,
+                                  width: iconWidth, height: iconHeight))
+        }
+        label.draw(at: CGPoint(x: rect.minX + rect.height + 4, y: rect.minY))
     }
 }

@@ -378,28 +378,32 @@ enum MarkdownTheme {
             // The enclosing range includes the newline, so empty lines inside the block are tagged too.
             lines.append(enclosingLine)
         }
+        // A fenced block opens with a header: the language on the left, Copy on the right.
+        let opening = lines.first.map { text.substring(with: $0).trimmingCharacters(in: .whitespaces) } ?? ""
+        let fenced = opening.hasPrefix("```") || opening.hasPrefix("~~~")
         for (index, line) in lines.enumerated() {
             var edges: CodeBlockEdges = []
             if index == 0 { edges.insert(.top) }
             if index == lines.count - 1 { edges.insert(.bottom) }
-            var style = codeParagraphStyle(edges)
-            if index == 0, let language {
-                let fenceStyle = style.mutableCopy() as! NSMutableParagraphStyle
-                fenceStyle.minimumLineHeight = codeLineHeight(fonts)
-                style = fenceStyle
-                if fenceHidden {
+            if index == 0, fenced { edges.insert(.header) }
+            storage.addAttributes([
+                .codeBlockEdges: edges.rawValue,
+                .paragraphStyle: codeParagraphStyle(edges, fonts: fonts,
+                                                    hiddenClosingFence: fenced && fenceHidden && index > 0
+                                                        && index == lines.count - 1 && isFence(line, in: text)),
+            ], range: line)
+            if edges.contains(.header) {
+                storage.addAttribute(.codeHeader, value: copyLabel(fonts: fonts, copied: false), range: line)
+                if fenceHidden, let language {
                     storage.addAttribute(.codeLanguage, value: languageLabel(language, fonts: fonts), range: line)
                 }
             }
-            storage.addAttributes([
-                .codeBlockEdges: edges.rawValue,
-                .paragraphStyle: style,
-            ], range: line)
         }
     }
 
-    private static func codeLineHeight(_ fonts: EditorFonts) -> CGFloat {
-        (fonts.code.ascender - fonts.code.descender + fonts.code.leading).rounded(.up)
+    private static func isFence(_ line: NSRange, in text: NSString) -> Bool {
+        let trimmed = text.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~")
     }
 
     private static func languageLabel(_ language: String, fonts: EditorFonts) -> NSAttributedString {
@@ -409,14 +413,37 @@ enum MarkdownTheme {
         ])
     }
 
-    private static func codeParagraphStyle(_ edges: CodeBlockEdges) -> NSParagraphStyle {
+    /// The "Copy" label of a code block header, drawn by the fragment and matched by the text view's
+    /// hover button (which shows "Copied" for a moment after a click).
+    static func copyLabel(fonts: EditorFonts, copied: Bool) -> NSAttributedString {
+        NSAttributedString(string: copied ? "Copied" : "Copy", attributes: [
+            .font: NSFont.systemFont(ofSize: (fonts.size * 0.75).rounded(), weight: .medium),
+            .foregroundColor: EditorPalette.secondaryText,
+        ])
+    }
+
+    /// Code lines have a fixed height (1.32 × the code size, a little more than SF Mono's own 1.19) and
+    /// touch, so the panel has no gaps. A hidden closing fence takes almost no room.
+    /// The header has its own height, a gap under its rule, and the same height whether its fence is
+    /// hidden or shown, so entering the block doesn't move anything.
+    private static func codeParagraphStyle(_ edges: CodeBlockEdges, fonts: EditorFonts,
+                                           hiddenClosingFence: Bool = false) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
         style.firstLineHeadIndent = 14
         style.headIndent = 14
         style.tailIndent = -14
-        style.lineSpacing = 2
-        style.paragraphSpacingBefore = edges.contains(.top) ? CodeBlockLayoutFragment.verticalPadding + 4 : 0
-        style.paragraphSpacing = edges.contains(.bottom) ? CodeBlockLayoutFragment.verticalPadding + 8 : 0
+        style.lineSpacing = 0
+        let height = edges.contains(.header) ? (fonts.size * 1.9).rounded()
+            : hiddenClosingFence ? 4 : (fonts.code.pointSize * 1.32).rounded()
+        style.minimumLineHeight = height
+        style.maximumLineHeight = height
+        if edges.contains(.header) {
+            style.paragraphSpacingBefore = 6
+            style.paragraphSpacing = CodeBlockLayoutFragment.headerGap
+        } else if edges.contains(.top) {
+            style.paragraphSpacingBefore = CodeBlockLayoutFragment.verticalPadding + 4
+        }
+        style.paragraphSpacing += edges.contains(.bottom) ? CodeBlockLayoutFragment.verticalPadding + 8 : 0
         return style
     }
 

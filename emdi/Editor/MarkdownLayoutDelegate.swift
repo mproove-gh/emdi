@@ -6,6 +6,8 @@ extension NSAttributedString.Key {
     /// Set on the hidden opening fence of a code block that names a language. The value is the styled
     /// label (an `NSAttributedString`) that `CodeBlockLayoutFragment` draws there.
     static let codeLanguage = NSAttributedString.Key("emdi.codeLanguage")
+    /// Set on the opening fence of a fenced code block, its header. The value is the styled "Copy" label.
+    static let codeHeader = NSAttributedString.Key("emdi.codeHeader")
     /// Set on the hidden `- [ ] ` prefix of a task item. The value is a Bool, true when checked.
     static let taskCheckbox = NSAttributedString.Key("emdi.taskCheckbox")
     /// Set on the hidden `-`, `*` or `+` of a bullet list item. The value is the item's nesting depth (Int).
@@ -60,6 +62,7 @@ final class MarkdownLayoutDelegate: NSObject, NSTextLayoutManagerDelegate {
             let fragment = CodeBlockLayoutFragment(textElement: textElement, range: range)
             fragment.edges = CodeBlockEdges(rawValue: edges)
             fragment.languageLabel = string.attribute(.codeLanguage, at: 0, effectiveRange: nil) as? NSAttributedString
+            fragment.copyLabel = string.attribute(.codeHeader, at: 0, effectiveRange: nil) as? NSAttributedString
             return fragment
         }
 
