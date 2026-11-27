@@ -146,4 +146,11 @@ struct MarkdownStylerTests {
         #expect(ranges(.blockImage(source: "a.png"), in: "![alt](a.png)") == [r(0, 13)])
         #expect(ranges(.blockImage(source: "a.png"), in: "text ![alt](a.png)").isEmpty)
     }
+
+    @Test func aRuleCoversOnlyItsOwnLine() {
+        let text = "Para.\n\n---\n\n\n\n## Next\n"
+        let rules = MarkdownStyler.spans(for: text).filter { $0.kind == .thematicBreak }
+        #expect(rules.map(\.range) == [NSRange(location: 7, length: 4)])
+        #expect(rules.map(\.blockRange) == [NSRange(location: 7, length: 4)])
+    }
 }

@@ -173,6 +173,10 @@ private struct SpanWalker {
             let content = addFences(in: range)
             addCodeTokens(in: content, language: codeBlock.language)
         case is ThematicBreak:
+            // swift-markdown's range runs over the blank lines that follow the rule: keep its own line,
+            // otherwise each of those lines is drawn as a rule too.
+            let line = nsText.lineRange(for: NSRange(location: range.location, length: 0))
+            let range = NSIntersectionRange(range, line).length > 0 ? NSIntersectionRange(range, line) : range
             block = range
             add(.thematicBreak, range)
         case is BlockQuote:
