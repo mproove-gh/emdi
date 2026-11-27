@@ -41,6 +41,7 @@ open build/Build/Products/Debug/emdi.app                           # run
 1. `MarkdownStyler.spans(for:)` (`emdi/Markdown`) parses the whole text with swift-markdown and returns `[StyleSpan]`. Each span has a kind (heading, strong, link, `.syntax`, …), an `NSRange`, and the `blockRange` of the leaf block it belongs to. Delimiters are derived as "node range minus its children's ranges".
 2. `SourceMap` converts swift-markdown locations (1-based line, **UTF-8 byte** column) to UTF-16 offsets. Every range in the pipeline is UTF-16 / `NSRange`, so non-ASCII text breaks any code that skips this conversion.
 3. `MarkdownTheme.apply` (`emdi/Editor`) resets the storage to the base attributes, then applies the spans in order: blocks, inline code, inline traits, syntax. A `.syntax` span is shown dimmed when `StyleSpan.isActive(block:selection:)`, and otherwise hidden with a 0.01 pt font and a clear color. The characters always stay in the text.
+   `apply` computes the attributes on a scratch `NSTextStorage`, then writes back only the paragraphs whose attributes changed. Never reset the whole storage: TextKit 2 discards the measured layout of every paragraph it's told changed, re-estimates the heights, and the content jumps while scrolled (on each caret move between blocks and while typing). Custom attribute values must compare by value for this, like `BlockImage.isEqual`.
 4. `MarkdownEditorView.Coordinator` re-parses on `textDidChange`. On a selection change it only re-applies styles, and only if the set of active blocks changed. It never restyles while `hasMarkedText()` is true, because that would break dead keys and accents, nor between `shouldChangeTextIn` and `textDidChange`, when the spans are stale.
 
 ## Code blocks (implemented)
@@ -125,6 +126,12 @@ open build/Build/Products/Debug/emdi.app                           # run
 - Saving follows Settings ▸ Editing ▸ "Save automatically while typing" (user default `autosaveWhileTyping`, off by default). When off, closing a modified document or quitting asks Save / Don't Save / Cancel. When on, `DocumentSaving.saveSoon` (called from the coordinator's `textDidChange`) saves the file `autosaveDelay` (0.8 s) after the last keystroke with `NSDocument.save(to:ofType:for:)`, and closing saves without asking. Untitled documents are not written until they are named. SwiftUI's `DocumentGroup` document class (`FileWrapperPlatformDocument`) always autosaves in place and has no API to change that, so `DocumentSaving` (`emdi/App/DocumentClosing.swift`) overrides its `autosavesInPlace` with the Objective-C runtime to return the setting. This happens when the first document window is adopted (`DocumentTabs.adopt`). Saving after the override was checked by hand in the real app, and saving while typing by a test that reads the file back.
 - `LastDocumentQuitter.shared`, started by `AppDelegate`, quits emdi when the last document window closes, so a lone Settings window never stays behind. Its `terminate` closure is replaceable for tests.
 - Testing caveat: an `NSDocument` only becomes "edited" when its undo group closes at the end of a real event. Calling `insertText` from a test doesn't mark it, and ending the undo group by hand corrupts the undo manager (exception at the next click). The close-and-save flow is best checked by hand.
+
+## Sample document and scrolling tests
+
+- `samples/showcase.md` (with `samples/images/`) uses every supported feature, for checking emdi by hand. The user ticks its task list while testing, so don't commit those edits unless asked.
+- `EditorScrollingTests` loads that file in an offscreen window and checks that the top of the visible area doesn't move when the caret changes block, while typing, or when a checkbox far from the caret is clicked (toggling a box never scrolls to the caret). Tests must not depend on the file's checkbox states.
+- An `NSWindow` made in a test needs `isReleasedWhenClosed = false`, otherwise `close()` over-releases it and the test host crashes. xcodebuild then restarts and may still print a passing summary for a partial run.
 
 ## Verifying rendering visually
 

@@ -29,7 +29,36 @@ enum MarkdownTheme {
         return [.font: fonts.body, .foregroundColor: EditorPalette.text, .paragraphStyle: paragraphStyle(for: fonts)]
     }
 
-    static func apply(_ spans: [StyleSpan], to storage: NSTextStorage, selection: NSRange, context: ThemeContext) {
+    /// Styles `target`. The attributes are computed on a scratch copy, then only the paragraphs whose
+    /// attributes changed are written back: TextKit 2 discards the measured layout of every paragraph it
+    /// is told changed, and re-estimating the heights of the whole document made the content jump
+    /// while scrolled (on each caret move between blocks, and while typing).
+    static func apply(_ spans: [StyleSpan], to target: NSTextStorage, selection: NSRange, context: ThemeContext) {
+        let storage = NSTextStorage(string: target.string)
+        style(spans, in: storage, selection: selection, context: context)
+        copyChangedParagraphs(from: storage, to: target)
+    }
+
+    private static func copyChangedParagraphs(from source: NSTextStorage, to target: NSTextStorage) {
+        let text = target.string as NSString
+        var changed: [NSRange] = []
+        text.enumerateSubstrings(in: NSRange(location: 0, length: text.length),
+                                 options: [.byParagraphs, .substringNotRequired]) { _, _, paragraph, _ in
+            if !target.attributedSubstring(from: paragraph).isEqual(to: source.attributedSubstring(from: paragraph)) {
+                changed.append(paragraph)
+            }
+        }
+        guard !changed.isEmpty else { return }
+        target.beginEditing()
+        for paragraph in changed {
+            source.enumerateAttributes(in: paragraph) { attributes, run, _ in
+                target.setAttributes(attributes, range: run)
+            }
+        }
+        target.endEditing()
+    }
+
+    private static func style(_ spans: [StyleSpan], in storage: NSTextStorage, selection: NSRange, context: ThemeContext) {
         let length = storage.length
         let fonts = EditorFonts()
         storage.beginEditing()

@@ -9,6 +9,14 @@ final class BlockImage: NSObject {
         self.image = image
         self.size = size
     }
+
+    /// Value equality, so restyling doesn't count an unchanged image paragraph as changed.
+    override func isEqual(_ object: Any?) -> Bool {
+        guard let other = object as? BlockImage else { return false }
+        return other.image === image && other.size == size
+    }
+
+    override var hash: Int { ObjectIdentifier(image).hashValue }
 }
 
 /// Lays out a paragraph that holds only an image and draws the image in the space

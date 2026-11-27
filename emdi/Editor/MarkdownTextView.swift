@@ -133,8 +133,9 @@ final class MarkdownTextView: NSTextView {
         guard bracket.location != NSNotFound, bracket.location + 1 < NSMaxRange(prefix) else { return false }
         let mark = NSRange(location: bracket.location + 1, length: 1)
         let isChecked = text.substring(with: mark) != " "
+        // The caret stays where it was, possibly far away: don't scroll back to it.
         apply(TextEdit(range: mark, replacement: isChecked ? " " : "x", selection: selectedRange()),
-              actionName: isChecked ? "Uncheck Task" : "Check Task")
+              actionName: isChecked ? "Uncheck Task" : "Check Task", scrollsToSelection: false)
         return true
     }
 
@@ -266,14 +267,14 @@ final class MarkdownTextView: NSTextView {
 
     /// Goes through `shouldChangeText`/`didChangeText` so the edit is undoable and the delegate restyles.
     /// Numbered lists around the edit are then renumbered.
-    private func apply(_ edit: TextEdit, actionName: String) {
+    private func apply(_ edit: TextEdit, actionName: String, scrollsToSelection: Bool = true) {
         isApplyingOwnEdit = true
         defer { isApplyingOwnEdit = false }
         guard shouldChangeText(in: edit.range, replacementString: edit.replacement) else { return }
         textStorage?.replaceCharacters(in: edit.range, with: edit.replacement)
         didChangeText()
         setSelectedRange(edit.selection)
-        scrollRangeToVisible(edit.selection)
+        if scrollsToSelection { scrollRangeToVisible(edit.selection) }
         undoManager?.setActionName(actionName)
         renumberLists(touching: NSRange(location: edit.range.location, length: (edit.replacement as NSString).length))
     }
