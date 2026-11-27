@@ -136,3 +136,7 @@ open build/Build/Products/Release/emdi.app
 `xcodebuild -scheme emdi -derivedDataPath build test` runs the tests. [`samples/showcase.md`](samples/showcase.md) uses every feature and is a good file to try emdi on.
 
 An app you build yourself is signed on your own Mac, so macOS opens it without the warning.
+
+## License
+
+emdi is released under the [MIT License](LICENSE). Copyright (c) 2026 mproove.
