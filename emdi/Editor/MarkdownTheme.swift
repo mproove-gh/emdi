@@ -132,6 +132,7 @@ enum MarkdownTheme {
                 storage.addAttributes([
                     .foregroundColor: EditorPalette.link,
                     .underlineStyle: NSUnderlineStyle.single.rawValue,
+                    .toolTip: "⌘-click to open",
                 ], range: range)
             case .marker:
                 storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range)

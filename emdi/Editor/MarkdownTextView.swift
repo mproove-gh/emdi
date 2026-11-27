@@ -48,11 +48,15 @@ final class MarkdownTextView: NSTextView {
         let point = convert(event.locationInWindow, from: nil)
         showCopyButton(at: point)
         if isOverControl(point) { NSCursor.arrow.set() }
+        updateLinkCursor(at: point, flags: event.modifierFlags)
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        if isOverControl(convert(event.locationInWindow, from: nil)) {
+        let point = convert(event.locationInWindow, from: nil)
+        if isOverControl(point) {
             NSCursor.arrow.set()
+        } else if event.modifierFlags.contains(.command), linkRange(at: point) != nil {
+            NSCursor.pointingHand.set()
         } else {
             super.cursorUpdate(with: event)
         }
@@ -125,6 +129,85 @@ final class MarkdownTextView: NSTextView {
         }
     }
 
+    // MARK: Links
+
+    /// Source ranges of the links and images, set by the coordinator after each parse.
+    var linkRanges: [NSRange] = []
+
+    /// The link drawn under `point`, from the drawn text segments, so hidden syntax doesn't count.
+    func linkRange(at point: NSPoint) -> NSRange? {
+        guard let layoutManager = textLayoutManager, let content = layoutManager.textContentManager else { return nil }
+        let origin = textContainerOrigin
+        let containerPoint = CGPoint(x: point.x - origin.x, y: point.y - origin.y)
+        guard let fragment = layoutManager.textLayoutFragment(for: containerPoint) else { return nil }
+        let start = content.offset(from: content.documentRange.location, to: fragment.rangeInElement.location)
+        let end = content.offset(from: content.documentRange.location, to: fragment.rangeInElement.endLocation)
+        var found: NSRange?
+        for link in linkRanges where link.location < end && NSMaxRange(link) > start {
+            guard let from = content.location(content.documentRange.location, offsetBy: link.location),
+                  let to = content.location(from, offsetBy: link.length),
+                  let range = NSTextRange(location: from, end: to) else { continue }
+            layoutManager.enumerateTextSegments(in: range, type: .standard, options: []) { _, rect, _, _ in
+                if rect.insetBy(dx: 0, dy: -2).contains(containerPoint) {
+                    // The innermost one wins (a link around an image).
+                    if found == nil || link.length < found!.length { found = link }
+                    return false
+                }
+                return true
+            }
+        }
+        return found
+    }
+
+    private func updateLinkCursor(at point: NSPoint, flags: NSEvent.ModifierFlags) {
+        guard !isOverControl(point) else { return }
+        if flags.contains(.command), linkRange(at: point) != nil {
+            NSCursor.pointingHand.set()
+        } else if flags.contains(.command) || NSCursor.current == NSCursor.pointingHand {
+            NSCursor.iBeam.set()
+        }
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        super.flagsChanged(with: event)
+        guard let window else { return }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        if visibleRect.contains(point) { updateLinkCursor(at: point, flags: event.modifierFlags) }
+    }
+
+    /// Opens the link under `point`: web and mail links with the system, Markdown files in emdi,
+    /// other files with their app, `#anchors` by moving to the heading. Returns whether a link
+    /// was there; a link that leads nowhere beeps.
+    private func openLink(at point: NSPoint) -> Bool {
+        guard let range = linkRange(at: point) else { return false }
+        let text = string
+        guard let link = LinkTarget.link(at: range.location, in: text) else { return false }
+        switch LinkTarget.resolve(link.destination, relativeTo: documentURL) {
+        case .url(let url):
+            NSWorkspace.shared.open(url)
+        case .file(let url):
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                NSSound.beep()
+                break
+            }
+            if ["md", "markdown"].contains(url.pathExtension.lowercased()) {
+                NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { _, _, _ in }
+            } else {
+                NSWorkspace.shared.open(url)
+            }
+        case .anchor(let anchor):
+            if let heading = LinkTarget.heading(forAnchor: anchor, in: text) {
+                setSelectedRange(NSRange(location: NSMaxRange(heading), length: 0))
+                scrollRangeToVisible(heading)
+            } else {
+                NSSound.beep()
+            }
+        case nil:
+            NSSound.beep()
+        }
+        return true
+    }
+
     // MARK: Task checkboxes
 
     /// Hidden `- [ ] ` prefixes of the task items, set by the coordinator after each parse.
@@ -135,6 +218,10 @@ final class MarkdownTextView: NSTextView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         if toggleTask(at: point) { return }
+        if event.clickCount == 1, event.modifierFlags.intersection([.shift, .command, .option, .control]) == .command,
+           openLink(at: point) {
+            return
+        }
         if event.clickCount == 2, let url = imageURL(at: point) {
             showQuickLook(for: url)
             return

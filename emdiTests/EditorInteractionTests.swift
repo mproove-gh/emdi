@@ -257,4 +257,31 @@ struct EditorInteractionTests {
         pasteboard.setString("hello", forType: .string)
         #expect(!host.textView.pasteImage(from: pasteboard))
     }
+
+    @Test func commandClickingAnAnchorLinkMovesToItsHeading() throws {
+        let host = try EditorTestHost(text: "Intro with [a link](#the-target) here.\n\nText.\n\n## The Target\n\nEnd.\n")
+        defer { host.close() }
+        host.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        host.pump()
+        let label = try host.location(of: "a link")
+        var point: NSPoint?
+        let layoutManager = try #require(host.textView.textLayoutManager)
+        let content = try #require(layoutManager.textContentManager)
+        let start = try #require(content.location(content.documentRange.location, offsetBy: label + 2))
+        let end = try #require(content.location(start, offsetBy: 1))
+        layoutManager.enumerateTextSegments(in: NSTextRange(location: start, end: end)!, type: .standard, options: []) { _, rect, _, _ in
+            let origin = host.textView.textContainerOrigin
+            point = NSPoint(x: rect.midX + origin.x, y: rect.midY + origin.y)
+            return false
+        }
+        let linkPoint = try #require(point)
+        #expect(host.textView.linkRange(at: linkPoint) != nil)
+
+        // A plain click edits the link; a ⌘-click follows it.
+        host.click(at: linkPoint)
+        #expect(host.textView.selectedRange().location < 30)
+        host.click(at: linkPoint, modifiers: .command)
+        let headingEnd = try host.location(of: "## The Target") + 13
+        #expect(host.textView.selectedRange() == NSRange(location: headingEnd, length: 0))
+    }
 }

@@ -67,10 +67,10 @@ final class EditorTestHost {
     }
 
     /// Clicks at `point` (text view coordinates) with a real mouse-down and mouse-up.
-    func click(at point: NSPoint) {
+    func click(at point: NSPoint, modifiers: NSEvent.ModifierFlags = []) {
         let windowPoint = textView.convert(point, to: nil)
         func event(_ type: NSEvent.EventType) -> NSEvent {
-            NSEvent.mouseEvent(with: type, location: windowPoint, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+            NSEvent.mouseEvent(with: type, location: windowPoint, modifierFlags: modifiers, timestamp: ProcessInfo.processInfo.systemUptime,
                                windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
         }
         // NSTextView tracks the mouse until it is released: queue the mouse-up first.

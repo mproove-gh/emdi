@@ -424,4 +424,5 @@ Vivamus facilisis diam at odio. Mauris dictum, nisi eget consequat elementum, la
 - [ ] Drop an image file from the Finder onto the editor
 - [ ] Paste a screenshot (⌘V): it is saved in images/ next to this file
 - [ ] Double-click an image to open it in Quick Look
+- [ ] ⌘-click a link to open it, or this one to jump to [the tables](#6-tables)
 - [ ] Switch between light and dark mode, and change fonts in Settings
