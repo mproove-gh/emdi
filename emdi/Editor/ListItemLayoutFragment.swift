@@ -1,7 +1,7 @@
 import AppKit
 
 /// Lays out a bullet list item and draws its bullet where the hidden `-`, `*` or `+` is:
-/// a disc at the top level, a circle one level down, a square below that, as in Typora.
+/// a disc at the top level, a circle one level down, a square below that.
 final class ListItemLayoutFragment: MarkdownLayoutFragment {
     /// The hidden marker character, relative to the paragraph.
     var bulletIndex = 0

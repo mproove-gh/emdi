@@ -1,6 +1,6 @@
 import Foundation
 
-/// Tab and Shift-Tab inside a table move between cells, as in spreadsheets and Typora,
+/// Tab and Shift-Tab inside a table move between cells, as in spreadsheets,
 /// instead of inserting a tab character (which would break the column alignment).
 enum TableEditing {
     /// The edit for Tab (or Shift-Tab when `backwards`) at `selection`, or nil when it is not in a table.

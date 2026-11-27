@@ -17,7 +17,7 @@ enum MarkdownTheme {
     /// Hidden syntax keeps its characters but takes almost no room and is not drawn.
     static let hiddenFont = NSFont.systemFont(ofSize: 0.01)
 
-    /// Body text spacing, relative to the text size: about 1.6 line height (as in Typora and most
+    /// Body text spacing, relative to the text size: about 1.6 line height (as in most
     /// reading apps). The gap between paragraphs is this spacing plus the short blank line between them.
     static func paragraphStyle(for fonts: EditorFonts) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
@@ -256,7 +256,7 @@ enum MarkdownTheme {
 
     private static let codeBackground = EditorPalette.inlineCodeBackground
 
-    /// Lays out list items as in Typora. Each nesting level is indented by `listLevelIndent`, whatever
+    /// Lays out list items. Each nesting level is indented by `listLevelIndent`, whatever
     /// the indentation in the source, and wrapped lines hang under the item's text. A `-`, `*` or `+`
     /// stays in the text but is drawn as a bullet that depends on the depth (`ListItemLayoutFragment`).
     /// Items sit closer together than paragraphs: the gap after a list comes from its blank line.
@@ -550,7 +550,7 @@ enum MarkdownTheme {
                     continue
                 }
             }
-            // Tables span the whole text column, like in Typora (1 pt is left for the right border),
+            // Tables span the whole text column (1 pt is left for the right border),
             // unless they are narrow: stretching a two-column table across the page only spreads it out.
             let fills = natural >= availableWidth * narrowTableRatio
             alignColumns(cells, in: storage, fillWidth: fills ? max(availableWidth - 1, 0) : 0)

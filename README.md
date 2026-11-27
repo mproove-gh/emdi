@@ -1,6 +1,6 @@
 # emdi
 
-**emdi** is a small, native Markdown editor for the Mac. Open a `.md` file and write: the Markdown renders live as you type, in a single pane, the way Typora does it. There is no preview pane, no sidebar and no mode to switch.
+**emdi** is a small, native Markdown editor for the Mac. Open a `.md` file and write: the Markdown renders live as you type, in a single pane. There is no preview pane, no sidebar and no mode to switch.
 
 It has two goals, in this order:
 

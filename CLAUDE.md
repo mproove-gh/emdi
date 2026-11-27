@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**emdi** is a native macOS Markdown editor/viewer in the spirit of Typora: a single-pane WYSIWYG editor where Markdown syntax renders live as you type. Its two guiding goals, in priority order when they conflict with features:
+**emdi** is a native macOS Markdown editor/viewer: a single-pane WYSIWYG editor where Markdown syntax renders live as you type. Its two guiding goals, in priority order when they conflict with features:
 
 1. **As simple to use as possible**: open a `.md` file and write. No settings screens, sidebars or modes unless clearly needed.
 2. **As light as possible**: small binary, fast launch, low memory use. No web views, no JavaScript, as few dependencies as possible.
@@ -74,7 +74,7 @@ zsh tools/make-installers.sh                                       # Release bui
 
 ## Block quotes (implemented)
 
-- The `>` markers of each quote line (with the space after the last one) are a `.quoteMarker(depth:blank:)` span, added by the outermost `BlockQuote` only. They are always hidden, whatever the caret position, like Typora.
+- The `>` markers of each quote line (with the space after the last one) are a `.quoteMarker(depth:blank:)` span, added by the outermost `BlockQuote` only. They are always hidden, whatever the caret position.
 - `MarkdownTheme` sets `.quoteBars` (a `QuoteBars`: depth and step, value-equal) on the line, and `indentQuotes` runs last: it shifts each quote line's existing paragraph style right by `depth × step` (1.2 × size), so lists and headings inside quotes keep their own layout. A blank `>` line is drawn short like a blank line, except under the caret.
 - Every emdi fragment inherits from `MarkdownLayoutFragment`, which draws one `EditorPalette.quoteBar` bar per level over the fragment's full height, so the bars of consecutive lines join up. The delegate sets `quoteBars` on whatever fragment it made. Bullets in a quote are drawn in the secondary color, like the quote text.
 - Backspace right after a quote prefix removes the innermost level (the last `>` and its space), through `quotePrefixRanges`, which the coordinator sets after each parse.
@@ -100,7 +100,7 @@ zsh tools/make-installers.sh                                       # Release bui
 
 ## Links (implemented)
 
-- A plain click in a link edits it (the syntax shows, as in any block). ⌘-click follows it, like Typora: `MarkdownTextView.mouseDown` hit-tests `linkRange(at:)` against the drawn text segments of the `.link` span ranges (`linkRanges`, set by the coordinator), so hidden syntax doesn't count. While ⌘ is held over a link the pointer is a hand (`mouseMoved`, `cursorUpdate`, `flagsChanged`), and links carry a "⌘-click to open" tooltip.
+- A plain click in a link edits it (the syntax shows, as in any block). ⌘-click follows it: `MarkdownTextView.mouseDown` hit-tests `linkRange(at:)` against the drawn text segments of the `.link` span ranges (`linkRanges`, set by the coordinator), so hidden syntax doesn't count. While ⌘ is held over a link the pointer is a hand (`mouseMoved`, `cursorUpdate`, `flagsChanged`), and links carry a "⌘-click to open" tooltip.
 - `LinkTarget` (`emdi/Markdown/LinkTarget.swift`, pure) parses the destination only at click time (`link(at:in:)`, reference links come resolved) and maps it with `resolve(_:relativeTo:)`: URLs with a scheme and `www.` go to `NSWorkspace`; paths resolve against the document's folder (fragment and query dropped, percent-decoded); `.md`/`.markdown` files open in emdi through `NSDocumentController`, other files with their app; `#anchor` moves the caret to the heading whose GitHub slug matches (`slug`, `heading(forAnchor:in:)`, repeats as `name-1`). A missing file, a relative link in an unsaved document or an unknown anchor beeps.
 
 ## Code highlighting (implemented)
@@ -147,12 +147,12 @@ zsh tools/make-installers.sh                                       # Release bui
 
 - The Fonts pane of Settings offers a text font family and size (11–28 pt, default 15) and a code font family. The code picker lists monospaced families first, then all others. Values live in user defaults (`textFontFamily`, `textFontSize`, `codeFontFamily`), and an empty family means the system font (SF Pro, or SF Mono for code).
 - `EditorFonts` (`emdi/Editor/EditorFonts.swift`) builds the real fonts from `FontSettings.current()`. Code is the text size minus 1, headings scale with the text size (32/25/21/18/15/14 pt at 15; H6 is in the secondary color), and a missing family falls back to the system font. `MarkdownTheme.apply` creates one `EditorFonts` per pass. Never hard-code font sizes in the theme or the fragments: `TaskLayoutFragment`, for example, reads the x-height from the item's actual font.
-- Body spacing scales with the text size (`MarkdownTheme.paragraphStyle(for:)`): line spacing about 0.38 × size (≈ 1.6 line height), paragraph spacing 0.4 × size. The look follows Typora: compact, no superfluous space.
+- Body spacing scales with the text size (`MarkdownTheme.paragraphStyle(for:)`): line spacing about 0.38 × size (≈ 1.6 line height), paragraph spacing 0.4 × size. The look is compact, with no superfluous space.
 - Blank lines (`StyleSpan.Kind.blankLine`, whitespace-only lines outside code blocks) are separators: drawn 0.35 × size high, except the one holding the caret, which keeps a full line for typing. They count in `activeSyntaxBlocks`, so moving onto or off one restyles.
 - List items get a tighter paragraph spacing (0.12 × size); the gap after a list comes from its blank line.
 - List layout (`MarkdownTheme.layOutListItems`, from `.listItem(depth:bullet:list:)` spans): each nesting level is indented by `listLevelIndent` (1.8 × size) whatever the source indentation, which is compensated with `firstLineHeadIndent`. Markers are right-aligned in a column as wide as the list's widest marker (at least 1.6 × size), so 9. and 10. line up and every item's text starts at the same place. Wrapped lines hang under the text (`headIndent`), and later paragraphs of an item (`.listContinuation`) are aligned with it too.
 - Bullets: the `-`, `*` or `+` stays in the text but is clear, with kern for the gap, and carries `.listBullet` (the depth). `ListItemLayoutFragment` draws a disc at depth 0, a circle at depth 1 and a square below, centred on the marker's own width and the text's x-height. Ordered markers stay visible text.
-- Headings get space above (0.8 × size for H1/H2, 0.6 below) and tight line spacing. The last line of an H1 or H2 has `.headingRule`, and `HeadingLayoutFragment` draws a 1 px `EditorPalette.border` rule under it across the column, like Typora. Setext headings are styled line by line (`styleHeadingLines`).
+- Headings get space above (0.8 × size for H1/H2, 0.6 below) and tight line spacing. The last line of an H1 or H2 has `.headingRule`, and `HeadingLayoutFragment` draws a 1 px `EditorPalette.border` rule under it across the column. Setext headings are styled line by line (`styleHeadingLines`).
 - Bold and italic (`MarkdownTheme.addTrait`) use the font's real variant only if converting actually changed the font: a heavier weight, or another italic face. Some families (AppleGothic, for example) have none, and AppKit may still report the trait. Those get faux bold (`.strokeWidth` -6) and faux italic (the same font with a sheared matrix from `fontDescriptor.withMatrix`; `.obliqueness` is ignored by TextKit 2). Headings in such fonts get the faux bold too. Known limit: bold plus italic in such a font shows only the italic, because the stroke doesn't apply to a sheared font.
 - Every `MarkdownEditorView.Coordinator` observes `UserDefaults.didChangeNotification` and restyles when `FontSettings` changed, so open documents update live.
 - Tests that touch font settings must use a separate `UserDefaults(suiteName:)` or remove the keys afterwards: the test host is the real app, so `UserDefaults.standard` is the user's own emdi preferences.
@@ -195,7 +195,7 @@ Known v1 limits: the whole document is re-parsed and restyled on each edit, whic
 - **App shell**: a SwiftUI `DocumentGroup` with a `FileDocument` for `.md` / `.markdown`. This gives open, save, autosave, versions, recent files and window tabs for free. Do not build custom file management.
 - **The Markdown text is the only source of truth.** The editor never converts to rich text and back. It edits the raw Markdown string in the `NSTextStorage` and only changes *attributes* (fonts, colors, hidden or shrunk syntax markers). What gets saved is exactly what the user typed.
 - **Parsing**: [swift-markdown](https://github.com/swiftlang/swift-markdown) (Apple, based on cmark-gfm) for the GFM syntax tree, including tables and task lists. Target: re-parse incrementally, or debounced, and restyle only the blocks that changed. v1 still does the whole document on each edit (see above).
-- **Typora-style live rendering**: syntax markers (`**`, `#`, `` ` ``, `[]()`, …) are hidden or dimmed everywhere except in the block that holds the caret, where the raw syntax is shown so it can be edited.
+- **Live rendering**: syntax markers (`**`, `#`, `` ` ``, `[]()`, …) are hidden or dimmed everywhere except in the block that holds the caret, where the raw syntax is shown so it can be edited.
 - **Rich blocks**: local images (paths resolved relative to the document's folder), tables and task-list checkboxes use TextKit 2 text attachments or attachment view providers. Clicking a checkbox toggles `[ ]` / `[x]` in the source text.
 - **Code highlighting**: a small built-in tokenizer covering common languages, applied to fenced code blocks. Do not use JS-based highlighters (Highlight.js, Highlightr, …).
 - **Formatting commands**: one shared set of commands (bold, italic, strikethrough, inline code, link, heading 1–6, bullet, numbered and task list, quote, code block, table) used by the editor's **right-click context menu**, the **Format** menu bar menu and keyboard shortcuts (⌘B, ⌘I, ⌘K, ⌘1–⌘6, …). Each command transforms the Markdown source around the selection, toggling when the style is already applied, and registers with the undo manager.
