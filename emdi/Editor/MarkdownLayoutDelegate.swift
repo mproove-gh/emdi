@@ -3,6 +3,9 @@ import AppKit
 extension NSAttributedString.Key {
     /// Set on every line of a code block. The value is a `CodeBlockEdges` raw value.
     static let codeBlockEdges = NSAttributedString.Key("emdi.codeBlockEdges")
+    /// Set on the hidden opening fence of a code block that names a language. The value is the styled
+    /// label (an `NSAttributedString`) that `CodeBlockLayoutFragment` draws there.
+    static let codeLanguage = NSAttributedString.Key("emdi.codeLanguage")
     /// Set on the hidden `- [ ] ` prefix of a task item. The value is a Bool, true when checked.
     static let taskCheckbox = NSAttributedString.Key("emdi.taskCheckbox")
     /// Set on each table line. The value is a `TableRowRole` raw value.
@@ -32,6 +35,7 @@ final class MarkdownLayoutDelegate: NSObject, NSTextLayoutManagerDelegate {
         if let edges = string.attribute(.codeBlockEdges, at: 0, effectiveRange: nil) as? Int {
             let fragment = CodeBlockLayoutFragment(textElement: textElement, range: range)
             fragment.edges = CodeBlockEdges(rawValue: edges)
+            fragment.languageLabel = string.attribute(.codeLanguage, at: 0, effectiveRange: nil) as? NSAttributedString
             return fragment
         }
 

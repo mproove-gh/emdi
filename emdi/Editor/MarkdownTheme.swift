@@ -75,7 +75,8 @@ enum MarkdownTheme {
                 emboldenIfNeeded(range, of: storage)
             case .codeBlock:
                 storage.addAttribute(.font, value: fonts.code, range: range)
-                markCodeBlockLines(in: range, of: storage)
+                markCodeBlockLines(in: range, of: storage, fonts: fonts,
+                                   fenceHidden: !StyleSpan.isActive(block: span.blockRange, selection: selection))
             case .blockQuote:
                 storage.addAttribute(.foregroundColor, value: EditorPalette.secondaryText, range: range)
             case .thematicBreak:
@@ -182,8 +183,12 @@ enum MarkdownTheme {
 
     /// Tags each line with its position in the block, which `CodeBlockLayoutFragment` uses to draw
     /// the full-width panel, and gives the lines padded, gap-free paragraph styles.
-    private static func markCodeBlockLines(in range: NSRange, of storage: NSTextStorage) {
+    /// The opening fence of a block that names a language keeps a full line's height, hidden or not,
+    /// and shows the language there while it is hidden.
+    private static func markCodeBlockLines(in range: NSRange, of storage: NSTextStorage, fonts: EditorFonts,
+                                           fenceHidden: Bool) {
         let text = storage.string as NSString
+        let language = CodeBlockText.language(of: text.substring(with: range))
         var lines: [NSRange] = []
         text.enumerateSubstrings(in: text.lineRange(for: range), options: [.byLines, .substringNotRequired]) { _, _, enclosingLine, _ in
             // The enclosing range includes the newline, so empty lines inside the block are tagged too.
@@ -193,11 +198,31 @@ enum MarkdownTheme {
             var edges: CodeBlockEdges = []
             if index == 0 { edges.insert(.top) }
             if index == lines.count - 1 { edges.insert(.bottom) }
+            var style = codeParagraphStyle(edges)
+            if index == 0, let language {
+                let fenceStyle = style.mutableCopy() as! NSMutableParagraphStyle
+                fenceStyle.minimumLineHeight = codeLineHeight(fonts)
+                style = fenceStyle
+                if fenceHidden {
+                    storage.addAttribute(.codeLanguage, value: languageLabel(language, fonts: fonts), range: line)
+                }
+            }
             storage.addAttributes([
                 .codeBlockEdges: edges.rawValue,
-                .paragraphStyle: codeParagraphStyle(edges),
+                .paragraphStyle: style,
             ], range: line)
         }
+    }
+
+    private static func codeLineHeight(_ fonts: EditorFonts) -> CGFloat {
+        (fonts.code.ascender - fonts.code.descender + fonts.code.leading).rounded(.up)
+    }
+
+    private static func languageLabel(_ language: String, fonts: EditorFonts) -> NSAttributedString {
+        NSAttributedString(string: language, attributes: [
+            .font: NSFont.systemFont(ofSize: (fonts.size * 0.75).rounded(), weight: .medium),
+            .foregroundColor: EditorPalette.secondaryText,
+        ])
     }
 
     private static func codeParagraphStyle(_ edges: CodeBlockEdges) -> NSParagraphStyle {

@@ -48,7 +48,22 @@ final class MarkdownTextView: NSTextView {
 
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
-        showCopyButton(at: convert(event.locationInWindow, from: nil))
+        let point = convert(event.locationInWindow, from: nil)
+        showCopyButton(at: point)
+        if isOverControl(point) { NSCursor.arrow.set() }
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        if isOverControl(convert(event.locationInWindow, from: nil)) {
+            NSCursor.arrow.set()
+        } else {
+            super.cursorUpdate(with: event)
+        }
+    }
+
+    /// Checkboxes and the copy button are clicked, not typed in: they get the arrow, not the I-beam.
+    func isOverControl(_ point: NSPoint) -> Bool {
+        (!copyButton.isHidden && copyButton.frame.contains(point)) || checkbox(at: point) != nil
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -109,22 +124,48 @@ final class MarkdownTextView: NSTextView {
     var taskPrefixRanges: [NSRange] = []
 
     override func mouseDown(with event: NSEvent) {
-        if toggleTask(at: convert(event.locationInWindow, from: nil)) { return }
-        super.mouseDown(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        if toggleTask(at: point) { return }
+        let plainClick = event.clickCount == 1 && event.modifierFlags.intersection([.shift, .command, .option]).isEmpty
+        let cell = plainClick ? tableCell(at: point) : nil
+        super.mouseDown(with: event)  // Tracks the mouse until it is released.
+        let text = string as NSString
+        if let cell, selectedRange().length == 0, NSMaxRange(cell) <= text.length {
+            let caret = TableEditing.caret(forClickIn: cell, of: text, at: selectedRange().location)
+            if caret != selectedRange().location { setSelectedRange(NSRange(location: caret, length: 0)) }
+        }
+    }
+
+    /// The table cell drawn under `point`, found from the drawn borders rather than the character
+    /// under the pointer: the wide padding of a cell is the kern of its hidden pipes.
+    private func tableCell(at point: NSPoint) -> NSRange? {
+        guard let layoutManager = textLayoutManager, let content = layoutManager.textContentManager else { return nil }
+        let origin = textContainerOrigin
+        let containerPoint = CGPoint(x: point.x - origin.x, y: point.y - origin.y)
+        guard let fragment = layoutManager.textLayoutFragment(for: containerPoint) as? TableRowLayoutFragment,
+              let border = fragment.cellBorders.last(where: { $0.x <= containerPoint.x - fragment.layoutFragmentFrame.minX })
+        else { return nil }
+        let paragraphStart = content.offset(from: content.documentRange.location, to: fragment.rangeInElement.location)
+        let cellStart = paragraphStart + border.pipeIndex + 1
+        return tableCells.first { $0.range.location == cellStart }?.range
+    }
+
+    /// The task item whose drawn checkbox is under `point`.
+    private func checkbox(at point: NSPoint) -> TaskLayoutFragment? {
+        guard let layoutManager = textLayoutManager else { return nil }
+        let origin = textContainerOrigin
+        let containerPoint = CGPoint(x: point.x - origin.x, y: point.y - origin.y)
+        guard let fragment = layoutManager.textLayoutFragment(for: containerPoint) as? TaskLayoutFragment else {
+            return nil
+        }
+        let frame = fragment.layoutFragmentFrame
+        let hitArea = fragment.checkboxRect.offsetBy(dx: frame.minX, dy: frame.minY).insetBy(dx: -4, dy: -4)
+        return hitArea.contains(containerPoint) ? fragment : nil
     }
 
     /// Toggles `[ ]` ↔ `[x]` when `point` is on a drawn checkbox. Returns whether it was.
     private func toggleTask(at point: NSPoint) -> Bool {
-        guard let layoutManager = textLayoutManager, let content = layoutManager.textContentManager else { return false }
-        let origin = textContainerOrigin
-        let containerPoint = CGPoint(x: point.x - origin.x, y: point.y - origin.y)
-        guard let fragment = layoutManager.textLayoutFragment(for: containerPoint) as? TaskLayoutFragment else {
-            return false
-        }
-        let frame = fragment.layoutFragmentFrame
-        let hitArea = fragment.checkboxRect.offsetBy(dx: frame.minX, dy: frame.minY).insetBy(dx: -4, dy: -4)
-        guard hitArea.contains(containerPoint) else { return false }
-
+        guard let content = textLayoutManager?.textContentManager, let fragment = checkbox(at: point) else { return false }
         let paragraphStart = content.offset(from: content.documentRange.location, to: fragment.rangeInElement.location)
         let prefix = NSRange(location: paragraphStart + fragment.prefixRange.location, length: fragment.prefixRange.length)
         let text = string as NSString

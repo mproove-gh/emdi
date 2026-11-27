@@ -14,6 +14,9 @@ final class CodeBlockLayoutFragment: NSTextLayoutFragment {
     private static let cornerRadius: CGFloat = 6
 
     var edges: CodeBlockEdges = []
+    /// The block's language, drawn on its hidden opening fence. Drawing only: it is not in the text,
+    /// so it is never copied.
+    var languageLabel: NSAttributedString?
 
     /// The panel rect in fragment coordinates.
     private var panelRect: CGRect {
@@ -50,6 +53,17 @@ final class CodeBlockLayoutFragment: NSTextLayoutFragment {
         context.setFillColor(EditorPalette.codeBlockBackground.cgColor)
         context.fillPath()
         context.restoreGState()
+
+        if let languageLabel, let line = textLineFragments.first {
+            let bounds = line.typographicBounds
+            let size = languageLabel.size()
+            let x = bounds.minX + line.locationForCharacter(at: 0).x
+            let origin = CGPoint(x: point.x + x, y: point.y + bounds.midY - size.height / 2)
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+            languageLabel.draw(at: origin)
+            NSGraphicsContext.restoreGraphicsState()
+        }
 
         super.draw(at: point, in: context)
     }

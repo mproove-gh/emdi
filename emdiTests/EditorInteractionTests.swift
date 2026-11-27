@@ -1,0 +1,107 @@
+import AppKit
+import Testing
+@testable import emdi
+
+/// Clicks and hovering in a real editor: table cells, code block labels, the pointer over controls.
+@MainActor
+struct EditorInteractionTests {
+    private static let document = """
+        Some text first.
+
+        | Name | Empty | Notes |
+        | ---- | ----- | ----- |
+        | Alpha |  | Long note here |
+        | Beta | x | y |
+
+        ```python
+        print("hi")
+        ```
+
+        ```
+        no language
+        ```
+
+        - [ ] A task
+
+        End.
+        """
+
+    /// The borders and paragraph offset of the table row whose line contains `needle`.
+    private func row(_ needle: String, in host: EditorTestHost) throws
+        -> (fragment: TableRowLayoutFragment, borders: [CGFloat], start: Int) {
+        let location = try host.location(of: needle)
+        let fragment = try #require(host.fragment(at: location) as? TableRowLayoutFragment)
+        let start = (host.textView.string as NSString).lineRange(for: NSRange(location: location, length: 0)).location
+        return (fragment, fragment.cellBorders.map(\.x), start)
+    }
+
+    private func clickInRow(_ needle: String, column: Int, fraction: CGFloat, in host: EditorTestHost) throws {
+        let (fragment, borders, _) = try row(needle, in: host)
+        let line = try #require(fragment.textLineFragments.first)
+        let x = borders[column] + (borders[column + 1] - borders[column]) * fraction
+        host.click(at: host.viewPoint(CGPoint(x: x, y: line.typographicBounds.midY), in: fragment))
+    }
+
+    @Test func clickingAnEmptyCellPutsTheCaretAtItsStart() throws {
+        let host = try EditorTestHost(text: Self.document)
+        defer { host.close() }
+        let (_, _, start) = try row("| Alpha |", in: host)
+        let emptyCellStart = start + ("| Alpha |" as NSString).length + 1  // after the pipe and one space
+        for fraction: CGFloat in [0.1, 0.5, 0.9] {
+            try clickInRow("| Alpha |", column: 1, fraction: fraction, in: host)
+            #expect(host.textView.selectedRange() == NSRange(location: emptyCellStart, length: 0), "fraction \(fraction)")
+        }
+    }
+
+    @Test func clickingPastACellsTextPutsTheCaretAtItsEnd() throws {
+        let host = try EditorTestHost(text: Self.document)
+        defer { host.close() }
+        try clickInRow("| Beta |", column: 0, fraction: 0.95, in: host)
+        let afterBeta = try host.location(of: "Beta |") + 4
+        #expect(host.textView.selectedRange() == NSRange(location: afterBeta, length: 0))
+        try clickInRow("| Beta |", column: 2, fraction: 0.95, in: host)
+        let afterY = try host.location(of: "x | y |") + 5
+        #expect(host.textView.selectedRange() == NSRange(location: afterY, length: 0))
+    }
+
+    @Test func codeBlocksShowTheirLanguageWhileTheFenceIsHidden() throws {
+        let host = try EditorTestHost(text: Self.document)
+        defer { host.close() }
+        let fence = try host.location(of: "```python")
+        host.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        host.pump()
+        let hidden = try #require(host.fragment(at: fence) as? CodeBlockLayoutFragment)
+        #expect(hidden.languageLabel?.string == "python")
+        let hiddenHeight = hidden.layoutFragmentFrame.height
+        let plain = try #require(host.fragment(at: try host.location(of: "```\nno language")) as? CodeBlockLayoutFragment)
+        #expect(plain.languageLabel == nil)
+
+        // In the block the fence itself shows, so no label; the line keeps its height.
+        host.textView.setSelectedRange(NSRange(location: try host.location(of: "print"), length: 0))
+        host.pump()
+        let shown = try #require(host.fragment(at: fence) as? CodeBlockLayoutFragment)
+        #expect(shown.languageLabel == nil)
+        #expect(abs(shown.layoutFragmentFrame.height - hiddenHeight) < 1)
+        // The label is drawing only: copying the block still gives just the code.
+        #expect(CodeBlockText.content(of: "```python\nprint(\"hi\")\n```") == "print(\"hi\")")
+    }
+
+    @Test func controlsGetTheArrowPointer() throws {
+        let host = try EditorTestHost(text: Self.document)
+        defer { host.close() }
+        let checkbox = try host.checkboxPoint("A task")
+        #expect(host.textView.isOverControl(checkbox))
+        #expect(!host.textView.isOverControl(NSPoint(x: checkbox.x + 120, y: checkbox.y)))
+
+        // Hover the code block: the copy button appears and counts as a control.
+        let code = try #require(host.fragment(at: try host.location(of: "print")))
+        let line = try #require(code.textLineFragments.first)
+        let inBlock = host.viewPoint(CGPoint(x: 40, y: line.typographicBounds.midY), in: code)
+        host.textView.mouseMoved(with: NSEvent.mouseEvent(
+            with: .mouseMoved, location: host.textView.convert(inBlock, to: nil), modifierFlags: [], timestamp: 0,
+            windowNumber: host.window.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!)
+        let button = try #require(host.textView.subviews.first { $0 is NSButton && !$0.isHidden })
+        #expect(host.textView.isOverControl(NSPoint(x: button.frame.midX, y: button.frame.midY)))
+        #expect(!host.textView.isOverControl(inBlock))
+    }
+}

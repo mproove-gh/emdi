@@ -33,6 +33,23 @@ struct TableEditingTests {
         #expect(result?.caret == (table as NSString).length + 3)
     }
 
+    @Test func clickingACellPutsTheCaretInItsText() {
+        let text = "| a |  | ccc |" as NSString
+        let empty = NSRange(location: 5, length: 2)     // "  "
+        let filled = NSRange(location: 8, length: 5)    // " ccc "
+        // An empty cell: always its start, wherever the click landed.
+        #expect(TableEditing.caret(forClickIn: empty, of: text, at: 5) == 6)
+        #expect(TableEditing.caret(forClickIn: empty, of: text, at: 7) == 6)
+        #expect(TableEditing.caret(forClickIn: empty, of: text, at: 10) == 6)  // hit the next cell
+        // A filled cell: clamped to "ccc".
+        #expect(TableEditing.caret(forClickIn: filled, of: text, at: 8) == 9)
+        #expect(TableEditing.caret(forClickIn: filled, of: text, at: 10) == 10)
+        #expect(TableEditing.caret(forClickIn: filled, of: text, at: 12) == 12)
+        #expect(TableEditing.caret(forClickIn: filled, of: text, at: 14) == 12)
+        // A cell with no padding at all.
+        #expect(TableEditing.caret(forClickIn: NSRange(location: 1, length: 0), of: "||" as NSString, at: 1) == 1)
+    }
+
     @Test func tabNeverInsertsATabCharacterInATable() {
         for caret in 0...(table as NSString).length {
             #expect(tab(table, at: caret)?.text.contains("\t") == false)

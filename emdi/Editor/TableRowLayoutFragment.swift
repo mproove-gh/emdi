@@ -23,6 +23,13 @@ final class TableRowLayoutFragment: NSTextLayoutFragment {
         return (CGRect(x: left, y: top, width: right - left, height: bottom - top), borders)
     }
 
+    /// Each drawn border, left to right, as the index of its `|` (relative to the paragraph) and its x
+    /// in fragment coordinates. Empty when the row draws no grid (the delimiter row, a table shown as Markdown).
+    var cellBorders: [(pipeIndex: Int, x: CGFloat)] {
+        guard let grid else { return [] }
+        return zip(pipes, grid.borders).map { ($0.index, $1) }.sorted { $0.x < $1.x }
+    }
+
     override var renderingSurfaceBounds: CGRect {
         guard let grid else { return super.renderingSurfaceBounds }
         return super.renderingSurfaceBounds.union(grid.rect.insetBy(dx: -1, dy: -1))

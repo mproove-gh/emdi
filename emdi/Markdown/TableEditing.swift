@@ -94,6 +94,20 @@ enum TableEditing {
     }
 
     /// Selects the cell's text without its padding spaces; an empty cell gets a caret in its middle.
+    /// Where a click in `cell` puts the caret, given the index the click hit: at the start of an empty
+    /// cell (where Tab would put it), otherwise clamped to the cell's text, never in its padding.
+    /// The padding is drawn wider than its spaces (kern on the hidden pipes), so a click in an empty
+    /// cell would otherwise land anywhere in it, or even in the next cell.
+    static func caret(forClickIn cell: NSRange, of text: NSString, at index: Int) -> Int {
+        let content = text.substring(with: cell) as NSString
+        var leading = 0
+        while leading < content.length, content.character(at: leading) == unichar(UInt8(ascii: " ")) { leading += 1 }
+        let trimmed = content.substring(from: leading).trimmingCharacters(in: .whitespaces) as NSString
+        guard trimmed.length > 0 else { return cell.location + min(1, cell.length) }
+        let start = cell.location + leading
+        return min(max(index, start), start + trimmed.length)
+    }
+
     private static func select(_ cell: StyleSpan, in text: NSString) -> TextEdit {
         let content = text.substring(with: cell.range) as NSString
         var leading = 0
