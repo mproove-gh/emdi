@@ -301,9 +301,11 @@ private struct EditingPane: View {
     }
 }
 
-/// Whether the Finder opens Markdown files with emdi, and a button to make it so.
+/// Whether the Finder opens Markdown files with emdi, with buttons to make it so or to hand
+/// them back to another app.
 private struct DefaultAppSection: View {
     @State private var isDefault = DefaultMarkdownApp.isEmdi
+    @State private var previous = DefaultMarkdownApp.previousApp()
     @State private var failure: String?
 
     var body: some View {
@@ -313,26 +315,60 @@ private struct DefaultAppSection: View {
                     Label("Default", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.secondary)
                 } else {
-                    Button("Make Default") {
-                        Task {
-                            do {
-                                try await DefaultMarkdownApp.makeEmdiDefault()
-                                failure = nil
-                            } catch {
-                                failure = error.localizedDescription
-                            }
-                            isDefault = DefaultMarkdownApp.isEmdi
+                    Button("Make Default") { run { try await DefaultMarkdownApp.makeEmdiDefault() } }
+                }
+            }
+            if isDefault {
+                LabeledContent("Hand them back") {
+                    if let previous {
+                        Button("Restore \(DefaultMarkdownApp.displayName(of: previous))") {
+                            run { try await DefaultMarkdownApp.handBack() }
                         }
+                    } else {
+                        Menu("Use Another App") {
+                            ForEach(DefaultMarkdownApp.otherApps, id: \.self) { app in
+                                Button(DefaultMarkdownApp.displayName(of: app)) {
+                                    run { try await DefaultMarkdownApp.handBack(to: app) }
+                                }
+                            }
+                        }
+                        .fixedSize()
                     }
                 }
             }
         } header: {
             Text("Markdown Files")
         } footer: {
-            Text(failure ?? "Double-clicking a .md file in the Finder then opens it in emdi. This copy of emdi is the one registered: if you move the app, make it the default again.")
+            Text(failure ?? footer)
                 .foregroundStyle(failure == nil ? .secondary : Color.red)
         }
-        .onAppear { isDefault = DefaultMarkdownApp.isEmdi }
+        .onAppear(perform: refresh)
+    }
+
+    private var footer: String {
+        if isDefault {
+            return previous == nil
+                ? "Choose the app that should open .md files instead of emdi."
+                : "Restoring gives .md files back to the app that opened them before emdi."
+        }
+        return "Double-clicking a .md file in the Finder then opens it in emdi. This copy of emdi is the one registered: if you move the app, make it the default again."
+    }
+
+    private func run(_ action: @escaping @MainActor () async throws -> Void) {
+        Task {
+            do {
+                try await action()
+                failure = nil
+            } catch {
+                failure = error.localizedDescription
+            }
+            refresh()
+        }
+    }
+
+    private func refresh() {
+        isDefault = DefaultMarkdownApp.isEmdi
+        previous = DefaultMarkdownApp.previousApp()
     }
 }
 

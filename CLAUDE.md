@@ -153,6 +153,7 @@ open build/Build/Products/Debug/emdi.app                           # run
 ## Default app for Markdown files (implemented)
 
 - Settings ▸ Editing ▸ Markdown Files shows whether the Finder opens .md files with this copy of emdi, and a Make Default button. `DefaultMarkdownApp` (`emdi/App/DefaultMarkdownApp.swift`) checks `NSWorkspace.urlForApplication(toOpen:)` and calls `setDefaultApplication(at:toOpen:)` for the system's type of `.md` / `.markdown` and emdi's `net.daringfireball.markdown`. macOS may ask the user to confirm. The registration points at the app's current location.
+- Before making emdi the default, `makeEmdiDefault` records each type's current app in the `previousMarkdownApps` user default (type identifier → app path; emdi itself is never recorded, so repeating keeps the original). While emdi is the default, the section shows "Restore <App>" (`handBack()`), or, when nothing was recorded or the app is gone, a "Use Another App" menu of `otherApps`. Handing back clears the record. `recording(_:over:emdi:)` is pure and tested.
 
 ## Closing documents and quitting (implemented)
 
