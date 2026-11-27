@@ -3,26 +3,26 @@ import AppKit
 /// emdi's colors. Each one has a light and a dark value and resolves when it is drawn, so the editor
 /// follows the appearance chosen in Settings (System, Light or Dark) without restyling.
 ///
-/// Light is a soft, warm paper (#F1EEE7) with near-black ink; dark is a soft charcoal with off-white
+/// Light is a soft, warm paper (#F6F4EE) with near-black ink; dark is a soft charcoal (#252528) with off-white
 /// text. Never pure white or pure black, which tire the eyes. Text contrast is above 12:1 in both, and
 /// dimmed text above 4.5:1. The emdi orange is used only for the text cursor.
 enum EditorPalette {
-    static let background = dynamic(light: 0xF1EEE7, dark: 0x1D1D1F)
+    static let background = dynamic(light: 0xF6F4EE, dark: 0x252528)
     static let text = dynamic(light: 0x1F1F22, dark: 0xE7E5E1)
     /// Quotes, list markers, finished tasks.
     static let secondaryText = dynamic(light: 0x58585F, dark: 0xA3A19D)
     /// Revealed syntax (`**`, `#`, fences) and rules: visible but quiet.
-    static let syntax = dynamic(light: 0xA19F99, dark: 0x67666A)
+    static let syntax = dynamic(light: 0xA4A29C, dark: 0x6E6D72)
     static let link = dynamic(light: 0x1C58B3, dark: 0x6AA8F7)
-    static let inlineCodeBackground = dynamic(light: 0xE4E0D7, dark: 0x2B2B2E)
-    static let codeBlockBackground = dynamic(light: 0xE7E3DA, dark: 0x262629)
-    static let tableHeaderBackground = dynamic(light: 0xE5E1D7, dark: 0x2D2D31)
-    static let border = dynamic(light: 0xD0CCC2, dark: 0x3C3C40)
+    static let inlineCodeBackground = dynamic(light: 0xE9E6DD, dark: 0x323236)
+    static let codeBlockBackground = dynamic(light: 0xECE9E0, dark: 0x2D2D31)
+    static let tableHeaderBackground = dynamic(light: 0xEAE7DD, dark: 0x343438)
+    static let border = dynamic(light: 0xD5D2C8, dark: 0x444448)
     /// Every other table row, and the quieter lines between table columns.
-    static let tableStripe = dynamic(light: 0xE9E6DE, dark: 0x252528)
-    static let tableColumnRule = dynamic(light: 0xDEDAD1, dark: 0x313135)
+    static let tableStripe = dynamic(light: 0xEFECE5, dark: 0x2B2B2E)
+    static let tableColumnRule = dynamic(light: 0xE3E0D7, dark: 0x39393D)
     /// The bars down the side of block quotes.
-    static let quoteBar = dynamic(light: 0xD3CEC4, dark: 0x45454A)
+    static let quoteBar = dynamic(light: 0xD8D4CA, dark: 0x4D4D52)
     static let checkbox = dynamic(light: 0x85837D, dark: 0x7D7C80)
     static let checkboxChecked = dynamic(light: 0x2F6FD6, dark: 0x5B9BF0)
     /// Callouts: the bar, icon and title in the kind's color, over a faint tint of it. The colors are

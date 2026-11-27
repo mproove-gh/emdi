@@ -62,6 +62,21 @@ struct SettingsView: View {
             .navigationTitle((selection ?? .appearance).title)
         }
         .frame(width: 700, height: 460)
+        // The same paper as the editor, in light and dark.
+        .containerBackground(Color(nsColor: EditorPalette.background), for: .window)
+    }
+}
+
+extension Color {
+    /// The frame around the selected option: the emdi orange of the text cursor and the logo.
+    static let emdiSelection = Color(nsColor: EditorPalette.cursor)
+}
+
+extension View {
+    /// The editor's paper behind a settings pane or the sidebar, instead of the system's own background.
+    func settingsBackground() -> some View {
+        scrollContentBackground(.hidden)
+            .background(Color(nsColor: EditorPalette.background))
     }
 }
 
@@ -82,6 +97,7 @@ struct SettingsSidebar: View {
             }
             .padding(.vertical, 2)
         }
+        .settingsBackground()
     }
 }
 
@@ -101,7 +117,7 @@ private struct AppearancePane: View {
                             VStack(spacing: 8) {
                                 ThemeThumbnail(choice: choice)
                                     .overlay(RoundedRectangle(cornerRadius: 9)
-                                        .strokeBorder(appearance == choice ? Color.accentColor : .clear, lineWidth: 3)
+                                        .strokeBorder(appearance == choice ? Color.emdiSelection : .clear, lineWidth: 3)
                                         .padding(-4))
                                 Text(choice.title)
                                     .foregroundStyle(appearance == choice ? .primary : .secondary)
@@ -114,6 +130,8 @@ private struct AppearancePane: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
+                // Rebuilt on each choice: the Form row otherwise kept showing the frame on a previous choice.
+                .id(appearance)
             } header: {
                 Text("Theme")
             } footer: {
@@ -122,6 +140,7 @@ private struct AppearancePane: View {
             }
         }
         .formStyle(.grouped)
+        .settingsBackground()
         .onChange(of: appearance) { _, newValue in
             newValue.apply()
         }
@@ -235,6 +254,7 @@ private struct FontsPane: View {
             }
         }
         .formStyle(.grouped)
+        .settingsBackground()
     }
 
     /// A few lines set in the chosen fonts.
@@ -275,6 +295,7 @@ private struct EditingPane: View {
             }
         }
         .formStyle(.grouped)
+        .settingsBackground()
     }
 }
 
@@ -302,7 +323,7 @@ private struct AppIconPane: View {
                             }
                             .padding(10)
                             .background(RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(iconChoice == option ? Color.accentColor : .clear, lineWidth: 3))
+                                .strokeBorder(iconChoice == option ? Color.emdiSelection : .clear, lineWidth: 3))
                         }
                         .buttonStyle(.plain)
                         .accessibilityAddTraits(iconChoice == option ? .isSelected : [])
@@ -310,6 +331,7 @@ private struct AppIconPane: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
+                .id(iconChoice)  // See AppearancePane.
             } header: {
                 Text("Icon")
             } footer: {
@@ -318,6 +340,7 @@ private struct AppIconPane: View {
             }
         }
         .formStyle(.grouped)
+        .settingsBackground()
         .onChange(of: iconChoice) { _, newValue in
             AppIcon.apply(newValue)
         }

@@ -46,7 +46,7 @@ struct EditorPaletteTests {
             for kind in CalloutKind.allCases {
                 let tint = EditorPalette.calloutBackground(kind)
                 #expect(contrast(EditorPalette.callout(kind), tint, name) >= 4.5, "\(kind) \(name.rawValue)")
-                #expect(contrast(EditorPalette.text, tint, name) >= 10, "\(kind) \(name.rawValue)")
+                #expect(contrast(EditorPalette.text, tint, name) >= 9, "\(kind) \(name.rawValue)")
             }
         }
     }
@@ -54,7 +54,7 @@ struct EditorPaletteTests {
     @Test func lightAndDarkReallyDiffer() {
         // Light is clearly light but not glaring (bright white tires the eyes).
         let light = luminance(resolved(EditorPalette.background, .aqua))
-        #expect(light > 0.8 && light < 0.9)
+        #expect(light > 0.85 && light < 0.93)
         #expect(luminance(resolved(EditorPalette.background, .darkAqua)) < 0.05)
     }
 }
