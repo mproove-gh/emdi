@@ -100,16 +100,29 @@ What this means for you:
 - If that's not good enough for you, read the code and [build it yourself](#building-from-source). It takes a minute.
 - For what it's worth, emdi has no network access, collects nothing and only reads and writes the files you open, plus the images you paste or drop.
 
-### Steps
+The [latest release](https://github.com/mproove-gh/emdi/releases/latest) offers three downloads. Pick one:
 
-1. Download `emdi-1.0.0.zip` from the [latest release](https://github.com/mproove-gh/emdi/releases/latest).
-2. Double-click the zip to unpack it, then drag **emdi.app** to your **Applications** folder.
-3. Open emdi. macOS says it *“could not verify emdi”*. Click **Done**, not Move to Trash.
-4. Open **System Settings ▸ Privacy & Security**, scroll down to **Security**, and click **Open Anyway** next to the message about emdi. Confirm with your password or Touch ID, then click **Open**.
+| File | How it installs | Best for |
+| --- | --- | --- |
+| `emdi-1.0.0.pkg` | An installer puts emdi in Applications for you | Most people |
+| `emdi-1.0.0.dmg` | You drag emdi onto the Applications folder | Those used to Mac apps |
+| `emdi-1.0.0.zip` | You unzip and move emdi yourself | Scripts, or if you prefer zips |
 
-You only do this once; after that, emdi opens normally.
+### With the installer (.pkg)
 
-If you are comfortable with the Terminal, this command does the same as steps 3 and 4. It removes the quarantine flag that macOS put on the downloaded app:
+1. Double-click `emdi-1.0.0.pkg`. macOS says it *“could not verify”* the package. Click **Done**, not Move to Trash.
+2. Open **System Settings ▸ Privacy & Security**, scroll down to **Security**, and click **Open Anyway** next to the message about the package. Confirm with your password or Touch ID, then click **Open**.
+3. Follow the installer: **Continue**, **Install**, then your password. emdi is now in Applications and opens without any further warning.
+
+### With the disk image (.dmg) or the zip
+
+1. Open `emdi-1.0.0.dmg` and drag **emdi** onto the **Applications** folder next to it. With the zip, double-click it and move **emdi.app** to Applications yourself.
+2. Open emdi from Applications. macOS says it *“could not verify emdi”*. Click **Done**, not Move to Trash.
+3. Open **System Settings ▸ Privacy & Security**, scroll down to **Security**, and click **Open Anyway** next to the message about emdi. Confirm with your password or Touch ID, then click **Open**.
+
+You only do this once. After that, emdi opens normally.
+
+If you are comfortable with the Terminal, this command replaces steps 2 and 3. It removes the quarantine flag that macOS put on the downloaded app:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/emdi.app
@@ -133,7 +146,7 @@ xcodebuild -scheme emdi -configuration Release -derivedDataPath build build
 open build/Build/Products/Release/emdi.app
 ```
 
-`xcodebuild -scheme emdi -derivedDataPath build test` runs the tests. [`samples/showcase.md`](samples/showcase.md) uses every feature and is a good file to try emdi on.
+`xcodebuild -scheme emdi -derivedDataPath build test` runs the tests. `zsh tools/make-installers.sh` builds the `.pkg`, `.dmg` and `.zip` in `build/`. [`samples/showcase.md`](samples/showcase.md) uses every feature and is a good file to try emdi on.
 
 An app you build yourself is signed on your own Mac, so macOS opens it without the warning.
 
